@@ -268,7 +268,7 @@ export const Walkthrough: React.FC = () => {
                         marginTop: 14,
                       }}
                     >
-                      HMAC(header.payload, secret) === signature
+                      HMACSHA256(base64url(header)+'.'+base64url(payload), secret) === signature
                     </div>
                   </div>
                 </div>

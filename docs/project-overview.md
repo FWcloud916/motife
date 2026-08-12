@@ -60,7 +60,7 @@ Prompt (concept description)
 
 ## 4. Directory Structure
 
-```
+```text
 motife/
 ├── src/
 │   └── remotion/                      # Remotion entry point (CLI entry-point search hits this
@@ -128,7 +128,7 @@ Local development only — macOS, Node ≥22, no CI yet.
 
 ### Deployment Pipeline
 
-TBD — not yet designed. Phase 4 lists deployment-shape options (open-source tool / demo site / self-use) as an explicit open decision (source: motife-plan.md §3 Phase 4). The render pipeline itself (`bundle()` → `selectComposition()` → `renderStill()`/`renderMedia()`) is implemented in `scripts/smoke.mjs` and will be reused by Phase 3's critique loop.
+TBD — not yet designed. Phase 4 lists deployment-shape options (open-source tool / demo site / self-use) as an explicit open decision (source: motife-plan.md §3 Phase 4). `scripts/smoke.mjs` implements the `bundle()` → `selectComposition()` → `renderStill()` pipeline (`renderMedia()` is not used there — the smoke test renders sampled stills, not video) and will be reused by Phase 3's critique loop.
 
 ### Configuration Hierarchy
 

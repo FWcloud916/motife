@@ -39,7 +39,7 @@ pnpm verify    # typecheck + lint + render smoke test — the verification gate 
 
 ## Project structure
 
-```
+```text
 motife/
 ├── motife-plan.md       # source project plan (Chinese)
 ├── src/remotion/         # Remotion composition source (Phase 0: JwtAuthFlow)

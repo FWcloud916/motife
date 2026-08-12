@@ -13,22 +13,26 @@ import {
 const PARTS = [
   {
     label: "HEADER",
-    value: "eyJhbGciOiJIUzI1NiJ9",
+    // base64url(JSON.stringify(code)) — kept in sync by hand; verify with:
+    // printf '%s' '{"alg":"HS256","typ":"JWT"}' | base64 | tr '+/' '-_' | tr -d '='
+    value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
     code: '{\n  "alg": "HS256",\n  "typ": "JWT"\n}',
     color: theme.color.header,
     note: "演算法與 token 類型",
   },
   {
     label: "PAYLOAD",
-    value: "eyJzdWIiOiI0MiJ9",
+    // base64url(JSON.stringify(code)) — see Header note above for how to verify.
+    value: "eyJzdWIiOiJ1c2VyXzQyIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2NTA3MjAwfQ",
     code: '{\n  "sub": "user_42",\n  "role": "admin",\n  "exp": 1786507200\n}',
     color: theme.color.payload,
     note: "Claims：身分與權限資料",
   },
   {
     label: "SIGNATURE",
+    // Illustrative placeholder, not a real HMAC output for the header/payload above.
     value: "SflKxwRJSMeKKF2QT4fwpMeJf36",
-    code: "HMACSHA256(\n  base64(header) + '.' +\n  base64(payload), secret\n)",
+    code: "HMACSHA256(\n  base64url(header) + '.' +\n  base64url(payload), secret\n)",
     color: theme.color.signature,
     note: "證明內容未被竄改",
   },
@@ -52,16 +56,18 @@ export const Breakdown: React.FC = () => {
       <div
         style={{
           position: "absolute",
-          top: 242,
+          top: 232,
           left: 96,
           right: 96,
           display: "flex",
+          flexWrap: "wrap",
           justifyContent: "center",
           alignItems: "center",
+          rowGap: 6,
           opacity: tokenIn,
           transform: `scale(${interpolate(tokenIn, [0, 1], [0.96, 1], clamp)})`,
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-          fontSize: 25,
+          fontSize: 19,
           fontWeight: 650,
         }}
       >
