@@ -1,0 +1,189 @@
+import type { FC, ReactNode } from "react";
+import { useContext, useEffect, useMemo } from "react";
+import { CameraRegistryContext, DIAGRAM_BOUNDS_ID } from "../Camera/CameraRegistryContext";
+import { FlowPulse } from "../FlowPulse/FlowPulse";
+import type { FlowSpec } from "../FlowPulse/FlowPulse";
+import { computeLayout } from "../layout/computeLayout";
+import type { GraphSpec } from "../layout/types";
+import { stagger } from "../motion/progress";
+import { resolveWindow } from "../motion/timing";
+import { useSceneTiming } from "../Scene/SceneContext";
+import type { Window } from "../tokens";
+import { tokens } from "../tokens";
+import { DiagramContext } from "./DiagramContext";
+import { DiagramNode } from "./DiagramNode";
+
+export interface DiagramProps {
+  graph: GraphSpec;
+  /** "contain" (default) scales the whole diagram to fit inside whatever
+   * box it's given, preserving proportions. "width" scales to the box's
+   * width only, letting height follow the diagram's own aspect ratio. */
+  fit?: "width" | "contain";
+  activeNodes?: string[];
+  reveal?: { order?: "rank" | "all"; window?: Window };
+  /** Convenience: render these FlowPulses inside this Diagram's own
+   * DiagramContext, instead of nesting <FlowPulse> as a child by hand. */
+  flows?: FlowSpec[];
+  /** Overlay slot — e.g. <CameraTarget> registrations. */
+  children?: ReactNode;
+}
+
+const DEFAULT_REVEAL_WINDOW: Window = { from: 0, to: 0.4 };
+
+function revealDelays(
+  nodeIds: string[],
+  layout: ReturnType<typeof computeLayout>,
+  direction: GraphSpec["direction"],
+  order: "rank" | "all",
+  baseDelay: number,
+): Record<string, number> {
+  const delays: Record<string, number> = {};
+  if (order !== "rank") {
+    for (const id of nodeIds) delays[id] = baseDelay;
+    return delays;
+  }
+  const axis = direction === "down" ? "y" : "x";
+  const sorted = [...nodeIds].sort((a, b) => layout.nodes[a][axis] - layout.nodes[b][axis]);
+  sorted.forEach((id, index) => {
+    delays[id] = baseDelay + stagger(index);
+  });
+  return delays;
+}
+
+// The only component in the library that turns topology into coordinates
+// (motife-plan.md §2 決策3) — computeLayout() is the sole call site.
+export const Diagram: FC<DiagramProps> = ({
+  graph,
+  fit = "contain",
+  activeNodes = [],
+  reveal: revealSpec,
+  flows = [],
+  children,
+}) => {
+  const layout = useMemo(() => computeLayout(graph), [graph]);
+  const { durationInFrames } = useSceneTiming();
+
+  // A <Diagram> nested inside a <Camera> hands framing over entirely to
+  // the Camera: it registers its node rects (and its own overall bounds,
+  // for `focus: "all"`) into the Camera's registry and renders at native
+  // scale with no self-imposed fit transform — Camera's pan/zoom needs to
+  // operate on the exact same coordinate space Diagram measured, and a
+  // second competing transform would desync the two. This means Diagram
+  // must render starting at Camera's own (0,0): don't put a centering or
+  // percentage-sized wrapper between <Camera> and a <Diagram> it should
+  // focus by node — that would offset Diagram's rendered position away
+  // from the local coordinates it just registered, exactly the way
+  // CameraTarget's offsetLeft/offsetTop measurement requires no
+  // intervening `position`-ed wrapper either.
+  const cameraRegistry = useContext(CameraRegistryContext);
+  useEffect(() => {
+    if (!cameraRegistry) return;
+    for (const id of Object.keys(layout.nodes)) {
+      cameraRegistry.register(id, layout.nodes[id]);
+    }
+    cameraRegistry.register(DIAGRAM_BOUNDS_ID, {
+      x: 0,
+      y: 0,
+      width: layout.width,
+      height: layout.height,
+    });
+  }, [cameraRegistry, layout]);
+
+  const revealWindow = revealSpec?.window ?? DEFAULT_REVEAL_WINDOW;
+  const baseDelay = resolveWindow(revealWindow, durationInFrames).startFrame;
+  const delays = revealDelays(
+    Object.keys(layout.nodes),
+    layout,
+    graph.direction,
+    revealSpec?.order ?? "all",
+    baseDelay,
+  );
+
+  const activeSet = new Set(activeNodes);
+  const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  const content = (
+    <DiagramContext.Provider value={layout}>
+      <svg
+        width={layout.width}
+        height={layout.height}
+        style={{ position: "absolute", left: 0, top: 0, overflow: "visible" }}
+      >
+        {Object.keys(layout.edges).map((id) => (
+          <path
+            key={id}
+            d={layout.edges[id].path}
+            fill="none"
+            stroke={tokens.color.line}
+            strokeWidth={2}
+          />
+        ))}
+      </svg>
+      {Object.keys(layout.nodes).map((id) => {
+        const node = nodesById.get(id);
+        if (!node) return null;
+        return (
+          <DiagramNode
+            key={id}
+            rect={layout.nodes[id]}
+            icon={node.icon}
+            label={node.label}
+            detail={node.detail}
+            tone={node.tone}
+            active={activeSet.has(id)}
+            delay={delays[id]}
+          />
+        );
+      })}
+      {flows.map((flow, index) => (
+        <FlowPulse key={index} flow={flow} />
+      ))}
+      {children}
+    </DiagramContext.Provider>
+  );
+
+  if (cameraRegistry) {
+    // Nested inside a <Camera>: render at native scale — see the effect
+    // above and Camera/CameraRegistryContext.ts for why framing is fully
+    // delegated to the ancestor Camera in this case.
+    return (
+      <div style={{ position: "relative", width: layout.width, height: layout.height }}>
+        {content}
+      </div>
+    );
+  }
+
+  // Standalone: fit the diagram into whatever box the caller gives it,
+  // with zero JavaScript measurement. SVG's native viewBox +
+  // preserveAspectRatio scaling is correct on the very first render — a
+  // JS ref-measurement (clientWidth/clientHeight of a wrapper div) is
+  // NOT: it can observe a stale pre-layout size depending on exactly when
+  // Remotion's headless Chrome settles the surrounding box, silently
+  // producing a wrong (usually much-too-small) scale. That isn't
+  // hypothetical — it's exactly what an earlier version of this component
+  // did, reproducibly, in `pnpm smoke`'s actual renderStill output.
+  //
+  // "contain" letterboxes within whatever box the parent gives (CSS
+  // object-fit:contain, via preserveAspectRatio). "width" instead grows
+  // the SVG element's OWN box to the diagram's aspect ratio at 100% width
+  // — a CSS `aspect-ratio`, not preserveAspectRatio, since the latter only
+  // fits content inside a box the element already has, it can't resize
+  // the element itself.
+  const svgSizeStyle =
+    fit === "width" ? { aspectRatio: `${layout.width} / ${layout.height}` } : { height: "100%" };
+
+  return (
+    <svg
+      viewBox={`0 0 ${layout.width} ${layout.height}`}
+      preserveAspectRatio="xMidYMid meet"
+      width="100%"
+      style={{ display: "block", overflow: "visible", ...svgSizeStyle }}
+    >
+      <foreignObject x={0} y={0} width={layout.width} height={layout.height}>
+        <div style={{ position: "relative", width: layout.width, height: layout.height }}>
+          {content}
+        </div>
+      </foreignObject>
+    </svg>
+  );
+};

@@ -21,8 +21,10 @@
     "upgrade:remotion": "remotion upgrade"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@remotion/cli": "4.0.508",
     "@remotion/google-fonts": "4.0.508",
+    "@remotion/paths": "4.0.508",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.508"

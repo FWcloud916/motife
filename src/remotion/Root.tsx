@@ -1,5 +1,6 @@
 import { Composition } from "remotion";
 import { loadFonts } from "../components/tokens";
+import { ComponentGallery, GALLERY_TOTAL_FRAMES } from "./compositions/gallery/ComponentGallery";
 import { JwtAuthFlow } from "./compositions/jwt-auth/JwtAuthFlow";
 import { FPS, WIDTH, HEIGHT, TOTAL_FRAMES } from "./compositions/jwt-auth/storyboard";
 
@@ -20,6 +21,15 @@ export const RemotionRoot: React.FC = () => (
       id="JwtAuthFlow"
       component={JwtAuthFlow}
       durationInFrames={TOTAL_FRAMES}
+      fps={FPS}
+      width={WIDTH}
+      height={HEIGHT}
+      defaultProps={{}}
+    />
+    <Composition
+      id="ComponentGallery"
+      component={ComponentGallery}
+      durationInFrames={GALLERY_TOTAL_FRAMES}
       fps={FPS}
       width={WIDTH}
       height={HEIGHT}

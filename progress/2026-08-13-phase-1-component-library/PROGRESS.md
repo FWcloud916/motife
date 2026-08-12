@@ -51,7 +51,7 @@ Full design detail in the linked plan snapshot.
 ## Task list
 
 - [x] PR 1 — tokens-and-foundation (tokens/fonts/motion/vitest + Scene, Callout, StepReveal, Icon registry)
-- [ ] PR 2 — diagram-flow-code (Diagram+dagre, FlowPulse, CodeBlock, Terminal, Camera, ComponentGallery)
+- [x] PR 2 — diagram-flow-code (Diagram+dagre, FlowPulse, CodeBlock, Terminal, Camera, ComponentGallery)
 - [ ] PR 3 — jwt-rebuild (JwtAuthFlowV2 acceptance rebuild + transitions)
 - [ ] PR 4 — swap-and-cleanup (swap into JwtAuthFlow id, delete old primitives, docs)
 
@@ -62,6 +62,8 @@ Full design detail in the linked plan snapshot.
 -
 - Starting PR 1 (tokens-and-foundation) on branch phase-1/tokens-and-foundation.
 - PR 1 (tokens-and-foundation) complete on branch phase-1/tokens-and-foundation: src/components/tokens (color/tone recipes, fontFamily, easing, spacing/duration/radius carried over from theme.ts), tokens/fonts.ts (Inter/NotoSansTC/JetBrainsMono via @remotion/google-fonts, CJK weights trimmed 4->2 to cut ~400 render-time network requests to ~200), motion/{timing,progress}.ts (pure, vitest-covered: resolveWindow/resolveSteps/stepStateAtFrame), icons/{registry,Icon}.tsx (11 IconNames, +cross/database/queue/lock/document), Scene/{Scene,SceneContext,Background}.tsx, Callout/Callout.tsx (pill/card/banner), StepReveal/StepReveal.tsx (+ exported useSteps hook for sibling-panel sync). theme.ts is now a deprecated re-export shim over src/components/tokens so Phase 0 scenes compile unchanged. Root.tsx calls loadFonts() once. vitest added, pnpm verify green (14 tests, typecheck+lint+smoke all pass). Baseline stills eyeballed against docs/assets/*.png for font-change parity -- visually identical.
+- Opened PR #2 (https://github.com/FWcloud916/motife/pull/2) for phase-1/tokens-and-foundation. Awaiting review/merge before starting PR 2 (diagram-flow-code).
+- PR 2 (diagram-flow-code) complete on branch phase-1/diagram-flow-code (stacked on PR 1): src/components/layout (GraphSpec/LayoutResult types, computeLayout via @dagrejs/dagre, rounded-corner SVG edgePath — all pure, vitest-covered incl. determinism), Diagram (+ ComponentGallery-verified rendering), FlowPulse (@remotion/paths getPointAtLength/evolvePath for the traveling dot + trailing stroke), CodeBlock (own tokenized micro-model, diff/highlight support), Terminal (deterministic typed-command simulation), Camera (+CameraTarget, zoom/pan/focus by Diagram node or registered target). Found and fixed a real determinism bug during visual verification: Diagram's original fit-scaling used a one-shot ref-measured clientWidth that could observe a stale pre-layout size in Remotion's actual renderStill pipeline (not just Studio) -- replaced with SVG viewBox+preserveAspectRatio (zero JS measurement); Camera's viewport size similarly switched from ref-measurement to useVideoConfig() (synchronous, exact). Also fixed a coordinate-space bug where Diagram nested in Camera must render at native scale starting at (0,0) with no offsetting wrapper, documented on both components. Verified visually via Remotion Studio (localhost:3000) and smoke.mjs renderStill output for all 5 components before considering the PR done. Extended scripts/smoke.mjs to smoke every registered composition via getCompositions() instead of one hardcoded id. pnpm verify green (30 tests, typecheck+lint+smoke both compositions).
 
 ## Outcome
 

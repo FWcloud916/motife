@@ -10,10 +10,15 @@
 
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
-import { ensureBrowser, renderStill, selectComposition } from "@remotion/renderer";
+import { ensureBrowser, getCompositions, renderStill } from "@remotion/renderer";
 
-const COMPOSITION_ID = "JwtAuthFlow";
-const SAMPLE_COUNT = 8;
+// Long compositions (the eval-set narrative videos) get 8 samples spread
+// across the timeline; short ones (the component gallery demo reel) get 4
+// — proportionally denser sampling doesn't add much signal on a shorter
+// timeline and just slows the gate down.
+const LONG_SAMPLE_COUNT = 8;
+const SHORT_SAMPLE_COUNT = 4;
+const LONG_THRESHOLD_FRAMES = 600; // 20s at 30fps
 const OUT_DIR = path.join(process.cwd(), "out", "smoke");
 
 async function main() {
@@ -26,41 +31,57 @@ async function main() {
     rspack: true,
   });
 
-  // Deliberately ONE object: selectComposition() and renderStill() below
-  // both receive it. Passing two different (even structurally-equal-looking)
-  // objects here is a classic Remotion footgun that silently desyncs
-  // duration/metadata calculation from the actual render.
+  // Deliberately ONE object, reused for every composition below and for
+  // both getCompositions() and renderStill(). Passing two different (even
+  // structurally-equal-looking) objects here is a classic Remotion footgun
+  // that silently desyncs duration/metadata calculation from the actual
+  // render.
   const inputProps = {};
 
-  const composition = await selectComposition({
-    serveUrl,
-    id: COMPOSITION_ID,
-    inputProps,
-  });
+  // Every registered <Composition> gets smoked — adding one to Root.tsx
+  // (an eval-set sibling, or a new demo scene) is automatically covered,
+  // no wiring to touch here.
+  const compositions = await getCompositions(serveUrl, { inputProps });
 
-  // Sample frames spread evenly across the whole timeline. Because this is
-  // derived from composition.durationInFrames, adding a scene to
-  // storyboard.ts automatically spreads the 8 samples over the new
-  // material — no wiring to touch here.
-  const lastFrame = composition.durationInFrames - 1;
-  const frames = Array.from({ length: SAMPLE_COUNT }, (_, i) =>
-    Math.round((i / (SAMPLE_COUNT - 1)) * lastFrame),
-  );
-  const uniqueFrames = [...new Set(frames)];
+  let totalFrames = 0;
+  for (const composition of compositions) {
+    const sampleCount =
+      composition.durationInFrames >= LONG_THRESHOLD_FRAMES
+        ? LONG_SAMPLE_COUNT
+        : SHORT_SAMPLE_COUNT;
+    const lastFrame = composition.durationInFrames - 1;
+    const frames = Array.from({ length: sampleCount }, (_, i) =>
+      Math.round((i / (sampleCount - 1)) * lastFrame),
+    );
+    const uniqueFrames = [...new Set(frames)];
 
-  for (const frame of uniqueFrames) {
-    const output = path.join(OUT_DIR, `frame-${String(frame).padStart(4, "0")}.png`);
-    await renderStill({
-      composition,
-      serveUrl,
-      frame,
-      inputProps,
-      output,
-    });
-    console.log(`smoke: rendered frame ${frame} -> ${path.relative(process.cwd(), output)}`);
+    for (const frame of uniqueFrames) {
+      const output = path.join(
+        OUT_DIR,
+        composition.id,
+        `frame-${String(frame).padStart(4, "0")}.png`,
+      );
+      await renderStill({
+        composition,
+        serveUrl,
+        frame,
+        inputProps,
+        output,
+      });
+      console.log(
+        `smoke: rendered ${composition.id} frame ${frame} -> ${path.relative(process.cwd(), output)}`,
+      );
+    }
+
+    totalFrames += uniqueFrames.length;
+    console.log(
+      `smoke: ${composition.id} OK — ${uniqueFrames.length} frames rendered from a ${composition.durationInFrames}-frame composition`,
+    );
   }
 
-  console.log(`smoke: OK — ${uniqueFrames.length} frames rendered from a ${composition.durationInFrames}-frame composition`);
+  console.log(
+    `smoke: OK — ${compositions.length} composition(s), ${totalFrames} frames total`,
+  );
 }
 
 main().catch((error) => {
