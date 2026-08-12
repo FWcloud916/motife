@@ -1,145 +1,120 @@
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
-import { theme } from "../../../theme";
-import {
-  Card,
-  GridBackdrop,
-  Icon,
-  Noise,
-  Pill,
-  clamp,
-  enter,
-} from "../visuals";
+// Phase 1 acceptance rebuild of scenes/Summary.tsx. Deliberately omits
+// Scene's `caption` prop, same as the original: this scene has never
+// rendered the storyboard's summary narration (see storyboard.ts).
+import type { FC } from "react";
+import { useCurrentFrame } from "remotion";
+import { Callout, Icon, Scene, reveal, tokens } from "../../../../components";
+import type { IconName, Tone } from "../../../../components";
 
-const RULES = [
-  { number: "01", title: "Verify signature", detail: "只信任你允許的演算法與 key" },
-  { number: "02", title: "Validate claims", detail: "檢查 exp、iss、aud 與權限" },
-  { number: "03", title: "Payload is public", detail: "不要放密碼或任何敏感資料" },
-] as const;
+interface SceneProps {
+  durationInFrames: number;
+}
 
-export const Summary: React.FC = () => {
+const RULES: Array<{ number: string; title: string; detail: string; icon: IconName; tone: Tone }> = [
+  { number: "01", title: "Verify signature", detail: "只信任你允許的演算法與 key", icon: "key", tone: "success" },
+  { number: "02", title: "Validate claims", detail: "檢查 exp、iss、aud 與權限", icon: "shield", tone: "success" },
+  { number: "03", title: "Payload is public", detail: "不要放密碼或任何敏感資料", icon: "user", tone: "warning" },
+];
+
+export const Summary: FC<SceneProps> = ({ durationInFrames }) => {
   const frame = useCurrentFrame();
-  const heroIn = enter(frame, 3);
+  const footerIn = reveal(frame, 110);
 
   return (
-    <AbsoluteFill
-      style={{
-        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-        overflow: "hidden",
+    <Scene
+      durationInFrames={durationInFrames}
+      background={{ variant: "grid", glow: "success" }}
+      header={{
+        eyebrow: "THE TAKEAWAY",
+        title: "驗證完整性，不是隱藏內容",
+        tone: "success",
+        scale: "hero",
       }}
     >
-      <GridBackdrop glow={theme.color.mint} />
-      <Noise />
-
-      <div
-        style={{
-          position: "absolute",
-          left: 96,
-          top: 92,
-          opacity: heroIn,
-          transform: `translateY(${interpolate(heroIn, [0, 1], [22, 0], clamp)}px)`,
-        }}
-      >
-        <Pill color={theme.color.mint}>THE TAKEAWAY</Pill>
-        <div
-          style={{
-            color: theme.color.text,
-            fontSize: 82,
-            fontWeight: 820,
-            letterSpacing: -3.5,
-            marginTop: 26,
-          }}
-        >
-          驗證完整性，不是隱藏內容
+      <div style={{ display: "flex", height: "100%", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: tokens.spacing.lg, width: "100%" }}>
+          {RULES.map((rule, index) => (
+            <div key={rule.number} style={{ flex: 1 }}>
+              <Callout
+                variant="card"
+                tone={rule.tone}
+                emphasis="medium"
+                size="lg"
+                window={{ from: 0.13 + index * 0.08, to: 0.13 + index * 0.08 + 0.25 }}
+              >
+                <div
+                  style={{
+                    alignSelf: "stretch",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: tokens.color.tone[rule.tone].fg,
+                      fontFamily: tokens.fontFamily.sans,
+                      fontSize: tokens.fontSize.xs,
+                      fontWeight: 850,
+                      letterSpacing: 2,
+                    }}
+                  >
+                    {rule.number}
+                  </div>
+                  <Icon name={rule.icon} tone={rule.tone} />
+                </div>
+                <div
+                  style={{
+                    alignSelf: "flex-start",
+                    color: tokens.color.text,
+                    fontFamily: tokens.fontFamily.sans,
+                    fontSize: tokens.fontSize.md,
+                    fontWeight: 780,
+                    marginTop: tokens.spacing.lg,
+                  }}
+                >
+                  {rule.title}
+                </div>
+                <div
+                  style={{
+                    alignSelf: "flex-start",
+                    color: tokens.color.textMuted,
+                    fontFamily: tokens.fontFamily.sans,
+                    fontSize: tokens.fontSize.sm,
+                    lineHeight: 1.55,
+                    marginTop: tokens.spacing.sm,
+                  }}
+                >
+                  {rule.detail}
+                </div>
+              </Callout>
+            </div>
+          ))}
         </div>
       </div>
 
       <div
         style={{
           position: "absolute",
-          left: 96,
-          right: 96,
-          top: 340,
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 28,
-        }}
-      >
-        {RULES.map((rule, index) => {
-          const progress = enter(frame, 38 + index * 25);
-          return (
-            <Card
-              key={rule.number}
-              accent={index === 2 ? theme.color.warning : theme.color.mint}
-              style={{
-                height: 350,
-                padding: 34,
-                opacity: progress,
-                transform: `translateY(${interpolate(progress, [0, 1], [34, 0], clamp)}px)`,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 55,
-                }}
-              >
-                <div
-                  style={{
-                    color: index === 2 ? theme.color.warning : theme.color.mint,
-                    fontSize: 23,
-                    fontWeight: 850,
-                    letterSpacing: 2,
-                  }}
-                >
-                  {rule.number}
-                </div>
-                <Icon
-                  name={index === 0 ? "key" : index === 1 ? "shield" : "user"}
-                  color={index === 2 ? theme.color.warning : theme.color.mint}
-                  size={54}
-                />
-              </div>
-              <div style={{ color: theme.color.text, fontSize: 32, fontWeight: 780 }}>
-                {rule.title}
-              </div>
-              <div
-                style={{
-                  color: theme.color.textMuted,
-                  fontSize: 22,
-                  lineHeight: 1.55,
-                  marginTop: 17,
-                }}
-              >
-                {rule.detail}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
-      <div
-        style={{
-          position: "absolute",
-          left: 96,
-          right: 96,
-          bottom: 76,
+          left: tokens.spacing.xl,
+          right: tokens.spacing.xl,
+          bottom: tokens.spacing.lg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 18,
-          opacity: enter(frame, 110),
-          color: theme.color.textMuted,
-          fontSize: 24,
+          gap: tokens.spacing.md,
+          opacity: footerIn,
+          color: tokens.color.textMuted,
+          fontFamily: tokens.fontFamily.sans,
+          fontSize: tokens.fontSize.sm,
         }}
       >
-        <Icon name="shield" color={theme.color.cyan} size={38} />
+        <Icon name="shield" tone="info" size="sm" />
         <span>
-          <strong style={{ color: theme.color.text }}>Sign · Verify · Authorize</strong>
+          <strong style={{ color: tokens.color.text }}>Sign · Verify · Authorize</strong>
           {" — "}這就是 JWT 的信任鏈
         </span>
       </div>
-    </AbsoluteFill>
+    </Scene>
   );
 };

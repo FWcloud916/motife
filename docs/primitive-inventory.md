@@ -2,7 +2,7 @@
 
 > **Type:** Reference (living document, updated while building)
 > **Audience:** Whoever designs the Phase 1 component library
-> **Last updated:** 2026-08-12
+> **Last updated:** 2026-08-13
 >
 > Records the visual primitives actually used while hand-building the JWT
 > auth flow video in `src/remotion/compositions/jwt-auth/`. This is the
@@ -42,8 +42,10 @@ valuable kind of finding — it's a gap the plan didn't anticipate.
 
 ## Design tokens observed
 
-Mirrors `src/remotion/theme.ts`. Update both together as real values are
-chosen while animating.
+Recorded here from the Phase 0 hand-built values; formalized in Phase 1 as
+`src/components/tokens/` (the `src/remotion/theme.ts` collection point this
+originally mirrored is deleted — `tokens` carries the same values forward,
+plus `easing`, `fontFamily`, and per-`Tone` color recipes).
 
 | Token | Value | Where used |
 |---|---|---|
@@ -60,10 +62,12 @@ chosen while animating.
 
 ## Coverage check against the planned component library
 
-Fill in at Phase 0 exit — this is what makes "a primitive inventory list"
-a verifiable exit criterion instead of a judgment call.
+Filled in at Phase 0 exit — this is what made "a primitive inventory list"
+a verifiable exit criterion instead of a judgment call. Status here
+reflects Phase 0 *usage*, not Phase 1 build status — see "Phase 1 outcome"
+below for what actually got built.
 
-| Planned component (motife-plan.md §3 Phase 1) | Status |
+| Planned component (motife-plan.md §3 Phase 1) | Phase 0 usage |
 |---|---|
 | `Scene` | used |
 | `Diagram` | used |
@@ -76,11 +80,35 @@ a verifiable exit criterion instead of a judgment call.
 
 `used` / `unused` / `missing` (i.e. needed but not in the planned list).
 
+## Phase 1 outcome
+
+All 8 planned components were built under `src/components/`, per PR
+sequence [tokens-and-foundation → diagram-flow-code → jwt-rebuild →
+swap-and-cleanup]. `Terminal` and `Camera` — unused at Phase 0 exit — were
+built speculatively per the plan; they're exercised by the
+`ComponentGallery` demo composition (`src/remotion/compositions/gallery/`)
+but not yet by a real narrative video. They're expected to see real use in
+the eval set's other two videos (MQ backpressure, DB index internals).
+
+Acceptance (motife-plan.md milestone M1) passed: `JwtAuthFlow` was rebuilt
+entirely from `src/components/` with hand-written props, replacing the
+Phase 0 scenes and `visuals.tsx` in place — see `docs/component-library.md`
+for the resulting public API and `docs/assets/jwt-auth-*-v2.png` for the
+rebuild compared against the stills below.
+
 ## Baseline stills
 
-The durable Phase 0 quality bar is captured at three representative frames;
-the full MP4 is not committed (`out/` is ignored):
+The durable Phase 0 quality bar, captured at three representative frames
+before the Phase 1 rebuild (`out/` itself is gitignored, so these stills —
+not a committed MP4 — are the historical record):
 
 - [JWT anatomy](assets/jwt-auth-anatomy.png) — Header, Payload, and Signature
 - [Claims validation](assets/jwt-auth-validation.png) — progressive server checklist
 - [Summary](assets/jwt-auth-summary.png) — the three operational rules
+
+The same three frames after the Phase 1 component-library rebuild, for
+direct comparison:
+
+- [JWT anatomy — v2](assets/jwt-auth-anatomy-v2.png)
+- [Claims validation — v2](assets/jwt-auth-validation-v2.png)
+- [Summary — v2](assets/jwt-auth-summary-v2.png)

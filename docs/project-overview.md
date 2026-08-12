@@ -2,7 +2,7 @@
 
 > **Type:** Explanation
 > **Audience:** Developers, AI assistants, and any tooling that needs project context
-> **Last updated:** 2026-08-12
+> **Last updated:** 2026-08-13
 >
 > How a technical concept description becomes an explainer MP4. Related docs: [motife-plan.md](../motife-plan.md).
 
@@ -20,7 +20,7 @@ Depends on an LLM provider for structured-output DSL generation and vision-based
 
 ### 1.3 Deprecated / Retired or Not-Yet-Enabled Features
 
-A Phase 0 hand-built baseline exists: one 40-second Remotion composition (`JwtAuthFlow`, `src/remotion/compositions/jwt-auth/`) with four finished scenes (intro, token anatomy, server-side verification, and summary), a primitive inventory, three committed reference stills, and a working `pnpm verify` gate. Its narration copy and provisional scene durations live in `storyboard.ts`, but narration audio is intentionally deferred until Phase 3's TTS-first timeline is implemented. No DSL, compiler, TTS integration, or agent pipeline exists yet. A second render target (a custom Rust engine using `vello`/`skia-safe`) is explicitly deferred to Phase 5, conditional on product validation and render cost/speed becoming a bottleneck — and, per Remotion's license, would have to be a clean-room implementation against the DSL spec rather than a port of Remotion's own source (source: [motife-plan.md](../motife-plan.md) §3 Phase 5; Remotion LICENSE.md).
+Phase 0 hand-built a 40-second baseline composition (`JwtAuthFlow`) directly with ad-hoc primitives (`visuals.tsx`) to establish a quality bar and a primitive inventory. Phase 1 replaced those primitives with the explainer component library under `src/components/` (`Scene`, `Diagram`, `FlowPulse`, `CodeBlock`, `Terminal`, `Camera`, `StepReveal`, `Callout`, plus a design-token system) and rebuilt `JwtAuthFlow` entirely from it — `visuals.tsx` and the Phase 0 scenes are deleted; `JwtAuthFlow` now means the component-library version. Its narration copy and provisional scene durations live in `storyboard.ts`, but narration audio is intentionally deferred until Phase 3's TTS-first timeline is implemented. No DSL, compiler, TTS integration, or agent pipeline exists yet. A second render target (a custom Rust engine using `vello`/`skia-safe`) is explicitly deferred to Phase 5, conditional on product validation and render cost/speed becoming a bottleneck — and, per Remotion's license, would have to be a clean-room implementation against the DSL spec rather than a port of Remotion's own source (source: [motife-plan.md](../motife-plan.md) §3 Phase 5; Remotion LICENSE.md).
 
 ## 2. Tech Stack
 
@@ -63,29 +63,42 @@ Prompt (concept description)
 ```text
 motife/
 ├── src/
+│   ├── components/                    # Phase 1 explainer component library — the only import
+│   │   │                              #   surface for compositions/** (see index.ts barrel)
+│   │   ├── index.ts                   # public barrel: tokens, Scene, Diagram, FlowPulse,
+│   │   │                              #   CodeBlock, Terminal, Camera, StepReveal, Callout, ...
+│   │   ├── tokens/                    # color/Tone recipes, fontFamily, easing, spacing, fonts.ts
+│   │   ├── motion/                    # pure timing/reveal helpers (Window -> frames, step state)
+│   │   ├── icons/                     # semantic IconName registry
+│   │   ├── layout/                    # computeLayout() — GraphSpec -> LayoutResult via dagre
+│   │   └── Scene/ Diagram/ FlowPulse/ CodeBlock/ Terminal/ Camera/ StepReveal/ Callout/
 │   └── remotion/                      # Remotion entry point (CLI entry-point search hits this
 │       │                              #   path with zero config; MUST NOT add src/index.ts, see AGENTS.md)
 │       ├── index.ts                   # registerRoot(RemotionRoot)
-│       ├── Root.tsx                   # <Composition/> registrations
-│       ├── theme.ts                   # design-token collection point (Phase 1 formalizes this)
+│       ├── Root.tsx                   # <Composition/> registrations; calls loadFonts() once
 │       └── compositions/
-│           └── jwt-auth/              # first eval-set video (Phase 0)
-│               ├── storyboard.ts      # pure data — prototype of the Phase 2 DSL step list
-│               ├── sceneRegistry.tsx  # SceneId -> component; missing entries are compile errors
-│               ├── JwtAuthFlow.tsx    # wiring only; zips storyboard x registry into <Sequence>s
-│               ├── visuals.tsx        # Phase 0-only repeated visual primitives and motion helpers
-│               └── scenes/            # finished hand-authored content (Intro/Breakdown/Walkthrough/Summary)
+│           ├── jwt-auth/              # first eval-set video — rebuilt in Phase 1 from
+│           │                          #   src/components/ (see progress/2026-08-13-phase-1-...)
+│           │   ├── storyboard.ts      # pure data — prototype of the Phase 2 DSL step list
+│           │   ├── sceneRegistry.tsx  # SceneId -> component; missing entries are compile errors
+│           │   ├── JwtAuthFlow.tsx    # wiring only; zips storyboard x registry into a
+│           │   │                      #   TransitionSeries (hard cuts — no transitions configured)
+│           │   └── scenes/            # Intro/Breakdown/Walkthrough/Summary, component-library only
+│           └── gallery/               # ComponentGallery — demo composition exercising all 8
+│                                       #   components, ensures pnpm smoke covers Terminal/Camera
 ├── scripts/
-│   └── smoke.mjs                      # render smoke test — layer 3 of `pnpm verify`
+│   └── smoke.mjs                      # render smoke test — layer 3 of `pnpm verify`;
+│                                       #   smokes every registered composition
 ├── public/                            # staticFile() assets (fonts, narration audio when added)
 ├── out/                                # render output (gitignored)
 ├── docs/
 │   ├── project-overview.md            # this file
-│   └── primitive-inventory.md         # Phase 0 deliverable — Phase 1 component-library spec
+│   ├── primitive-inventory.md         # Phase 0 deliverable — Phase 1 component-library spec
+│   └── component-library.md           # Phase 1 deliverable — public component API reference
 └── progress/                          # development progress tracker
 ```
 
-Reserved for later phases, not yet created: `src/components/` (Phase 1 component library), `src/dsl/` (Phase 2 JSON Schema), `src/compiler/` (Phase 2 DSL→Remotion compiler), `src/agent/` and `src/tts/` and `src/critique/` (Phase 3).
+Reserved for later phases, not yet created: `src/dsl/` (Phase 2 JSON Schema), `src/compiler/` (Phase 2 DSL→Remotion compiler), `src/agent/` and `src/tts/` and `src/critique/` (Phase 3).
 
 ## 5. Domain Models (High-Level)
 

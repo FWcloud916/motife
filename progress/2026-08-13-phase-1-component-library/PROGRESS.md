@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-1/diagram-flow-code` | N/A |  |
+| `motife` | `phase-1/jwt-rebuild` | N/A |  |
 
 ## Background & goals
 
@@ -53,7 +53,7 @@ Full design detail in the linked plan snapshot.
 - [x] PR 1 — tokens-and-foundation (tokens/fonts/motion/vitest + Scene, Callout, StepReveal, Icon registry)
 - [x] PR 2 — diagram-flow-code (Diagram+dagre, FlowPulse, CodeBlock, Terminal, Camera, ComponentGallery)
 - [x] PR 3 — jwt-rebuild (JwtAuthFlowV2 acceptance rebuild + transitions)
-- [ ] PR 4 — swap-and-cleanup (swap into JwtAuthFlow id, delete old primitives, docs)
+- [x] PR 4 — swap-and-cleanup (swap into JwtAuthFlow id, delete old primitives, docs)
 
 ## Work log
 
@@ -66,6 +66,8 @@ Full design detail in the linked plan snapshot.
 - PR 2 (diagram-flow-code) complete on branch phase-1/diagram-flow-code (stacked on PR 1): src/components/layout (GraphSpec/LayoutResult types, computeLayout via @dagrejs/dagre, rounded-corner SVG edgePath — all pure, vitest-covered incl. determinism), Diagram (+ ComponentGallery-verified rendering), FlowPulse (@remotion/paths getPointAtLength/evolvePath for the traveling dot + trailing stroke), CodeBlock (own tokenized micro-model, diff/highlight support), Terminal (deterministic typed-command simulation), Camera (+CameraTarget, zoom/pan/focus by Diagram node or registered target). Found and fixed a real determinism bug during visual verification: Diagram's original fit-scaling used a one-shot ref-measured clientWidth that could observe a stale pre-layout size in Remotion's actual renderStill pipeline (not just Studio) -- replaced with SVG viewBox+preserveAspectRatio (zero JS measurement); Camera's viewport size similarly switched from ref-measurement to useVideoConfig() (synchronous, exact). Also fixed a coordinate-space bug where Diagram nested in Camera must render at native scale starting at (0,0) with no offsetting wrapper, documented on both components. Verified visually via Remotion Studio (localhost:3000) and smoke.mjs renderStill output for all 5 components before considering the PR done. Extended scripts/smoke.mjs to smoke every registered composition via getCompositions() instead of one hardcoded id. pnpm verify green (30 tests, typecheck+lint+smoke both compositions).
 - Opened PR #3 (https://github.com/FWcloud916/motife/pull/3) for phase-1/diagram-flow-code, stacked on/targeting phase-1/tokens-and-foundation (#2). Continuing to PR 3 (jwt-rebuild).
 - PR 3 (jwt-rebuild) complete on branch phase-1/jwt-rebuild (stacked on PR 2): rebuilt all 4 JwtAuthFlow scenes (Intro, Breakdown, Walkthrough, Summary) under scenes-v2/ using only src/components, registered as JwtAuthFlowV2 alongside the untouched Phase 0 baseline, wired through @remotion/transitions TransitionSeries with no Transition between scenes (hard-cut, timing-equivalent to the baseline's plain Sequence zip). Walkthrough (the hardest target) replaces the original's hardcoded per-step frame numbers with resolveSteps()/stepStateAtFrame() driven off one shared STEPS_WINDOW, so the checklist and the synced detail panel both re-time automatically if duration changes. Found and fixed one real component bug during the rebuild: FlowPulse's edge label could land directly on top of a node icon on short edges (dagre routes to the node's vertical center) -- fixed with an SVG paintOrder:'stroke' halo so the label stays legible regardless of what's underneath, no text measurement needed. Saved v2 stills (anatomy/validation/summary) to docs/assets/ next to the Phase 0 originals for direct comparison -- visually confirmed quality matches or exceeds the baseline at all three reference frames. pnpm verify green (30 tests, typecheck+lint+smoke across all 3 compositions).
+- Opened PR #4 (https://github.com/FWcloud916/motife/pull/4) for phase-1/jwt-rebuild, stacked on/targeting phase-1/diagram-flow-code (#3). Continuing to PR 4 (swap-and-cleanup).
+- PR 4 (swap-and-cleanup) complete on branch phase-1/swap-and-cleanup (stacked on PR 3): swapped scenes-v2/ into place as scenes/, sceneRegistryV2.tsx/JwtAuthFlowV2.tsx renamed to replace the originals (composition id stays 'JwtAuthFlow' -- the stable public handle pnpm render/still/smoke all address). Deleted the Phase 0 primitives: visuals.tsx, src/remotion/theme.ts (the deprecated shim), and the old scenes/*.tsx. Root.tsx now registers only 2 compositions (JwtAuthFlow, ComponentGallery) -- no more V2 duplicate. Updated docs/primitive-inventory.md (Phase 1 outcome section, v2 stills linked) and docs/project-overview.md (directory tree, Phase 0/1 narrative) with Last-updated bumps; added docs/component-library.md as the Phase 1 public API reference / Phase 2 DSL schema draft. Skipped the optional ESLint import-restriction hardening (fragile to encode correctly across varying relative-import depths; noted as a follow-up rather than risking a broken lint config). pnpm verify green end-to-end; pnpm still confirmed the swapped composition renders correctly through the real Remotion CLI, not just the smoke script.
 
 ## Outcome
 
