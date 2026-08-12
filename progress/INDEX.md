@@ -10,7 +10,7 @@ workflow.
 | Status | Item | Folder | Scope | Ticket | Plan | Created | Notes |
 |---|---|---|---|---|---|---|---|
 | `done` | Phase 0 — Anchoring: Manual Baseline Video and Primitive Inventory | `progress/2026-08-12-phase-0-anchor/` | `motife` | N/A | [phase-0-anchor-motife-plan.md](_plans/phase-0-anchor-motife-plan.md) | 2026-08-12 |  |
-| `in-progress` | Phase 1 — 解說元件庫 (Explainer Component Library) | `progress/2026-08-13-phase-1-component-library/` | `motife` | N/A | [phase-1-component-library-plan-next-phase-generic-penguin.md](_plans/phase-1-component-library-plan-next-phase-generic-penguin.md) | 2026-08-13 |  |
+| `review` | Phase 1 — 解說元件庫 (Explainer Component Library) | `progress/2026-08-13-phase-1-component-library/` | `motife` | N/A | [phase-1-component-library-plan-next-phase-generic-penguin.md](_plans/phase-1-component-library-plan-next-phase-generic-penguin.md) | 2026-08-13 |  |
 
 ## Status legend
 

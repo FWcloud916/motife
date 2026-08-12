@@ -1,7 +1,7 @@
 # Phase 1 — 解說元件庫 (Explainer Component Library)
 
 **Slug:** phase-1-component-library
-**Status:** in-progress
+**Status:** review
 **Ticket:** N/A
 **Related plan:** [phase-1-component-library-plan-next-phase-generic-penguin.md](../_plans/phase-1-component-library-plan-next-phase-generic-penguin.md)
 **Created:** 2026-08-13
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-1/jwt-rebuild` | N/A |  |
+| `motife` | `phase-1/swap-and-cleanup` | N/A |  |
 
 ## Background & goals
 
@@ -68,6 +68,7 @@ Full design detail in the linked plan snapshot.
 - PR 3 (jwt-rebuild) complete on branch phase-1/jwt-rebuild (stacked on PR 2): rebuilt all 4 JwtAuthFlow scenes (Intro, Breakdown, Walkthrough, Summary) under scenes-v2/ using only src/components, registered as JwtAuthFlowV2 alongside the untouched Phase 0 baseline, wired through @remotion/transitions TransitionSeries with no Transition between scenes (hard-cut, timing-equivalent to the baseline's plain Sequence zip). Walkthrough (the hardest target) replaces the original's hardcoded per-step frame numbers with resolveSteps()/stepStateAtFrame() driven off one shared STEPS_WINDOW, so the checklist and the synced detail panel both re-time automatically if duration changes. Found and fixed one real component bug during the rebuild: FlowPulse's edge label could land directly on top of a node icon on short edges (dagre routes to the node's vertical center) -- fixed with an SVG paintOrder:'stroke' halo so the label stays legible regardless of what's underneath, no text measurement needed. Saved v2 stills (anatomy/validation/summary) to docs/assets/ next to the Phase 0 originals for direct comparison -- visually confirmed quality matches or exceeds the baseline at all three reference frames. pnpm verify green (30 tests, typecheck+lint+smoke across all 3 compositions).
 - Opened PR #4 (https://github.com/FWcloud916/motife/pull/4) for phase-1/jwt-rebuild, stacked on/targeting phase-1/diagram-flow-code (#3). Continuing to PR 4 (swap-and-cleanup).
 - PR 4 (swap-and-cleanup) complete on branch phase-1/swap-and-cleanup (stacked on PR 3): swapped scenes-v2/ into place as scenes/, sceneRegistryV2.tsx/JwtAuthFlowV2.tsx renamed to replace the originals (composition id stays 'JwtAuthFlow' -- the stable public handle pnpm render/still/smoke all address). Deleted the Phase 0 primitives: visuals.tsx, src/remotion/theme.ts (the deprecated shim), and the old scenes/*.tsx. Root.tsx now registers only 2 compositions (JwtAuthFlow, ComponentGallery) -- no more V2 duplicate. Updated docs/primitive-inventory.md (Phase 1 outcome section, v2 stills linked) and docs/project-overview.md (directory tree, Phase 0/1 narrative) with Last-updated bumps; added docs/component-library.md as the Phase 1 public API reference / Phase 2 DSL schema draft. Skipped the optional ESLint import-restriction hardening (fragile to encode correctly across varying relative-import depths; noted as a follow-up rather than risking a broken lint config). pnpm verify green end-to-end; pnpm still confirmed the swapped composition renders correctly through the real Remotion CLI, not just the smoke script.
+- Opened PR #5 (https://github.com/FWcloud916/motife/pull/5) for phase-1/swap-and-cleanup, stacked on/targeting phase-1/jwt-rebuild (#4). All 4 Phase 1 PRs are now open, stacked in order (#2 tokens-and-foundation -> #3 diagram-flow-code -> #4 jwt-rebuild -> #5 swap-and-cleanup), each individually pnpm-verify-green. Merge order: #2, #3, #4, #5 into main. Transitioning item to review pending merge.
 
 ## Outcome
 
