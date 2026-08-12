@@ -9,7 +9,7 @@ workflow.
 
 | Status | Item | Folder | Scope | Ticket | Plan | Created | Notes |
 |---|---|---|---|---|---|---|---|
-| `planning` | Phase 0 — Anchoring: Manual Baseline Video and Primitive Inventory | `progress/2026-08-12-phase-0-anchor/` | `motife` | N/A | [phase-0-anchor-motife-plan.md](_plans/phase-0-anchor-motife-plan.md) | 2026-08-12 |  |
+| `in-progress` | Phase 0 — Anchoring: Manual Baseline Video and Primitive Inventory | `progress/2026-08-12-phase-0-anchor/` | `motife` | N/A | [phase-0-anchor-motife-plan.md](_plans/phase-0-anchor-motife-plan.md) | 2026-08-12 |  |
 
 ## Status legend
 
