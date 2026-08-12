@@ -32,25 +32,29 @@ export const SCENES = [
     id: "intro",
     beat: "intro",
     durationInSeconds: 6,
-    narration: "TODO",
+    narration:
+      "每次登入之後，JWT 讓客戶端帶著一張可驗證的數位通行證，向 API 證明自己的身分。",
   },
   {
     id: "breakdown",
     beat: "breakdown",
     durationInSeconds: 10,
-    narration: "TODO",
+    narration:
+      "一個 JWT 由 Header、Payload、Signature 三段組成。前兩段只是 Base64URL 編碼，任何人都能讀；真正防止竄改的是簽章。",
   },
   {
     id: "walkthrough",
     beat: "walkthrough",
     durationInSeconds: 18,
-    narration: "TODO",
+    narration:
+      "API 收到 Bearer token 後，先重新計算並比對簽章，再檢查有效期限、簽發者和受眾。全部通過，請求才會被授權。",
   },
   {
     id: "summary",
     beat: "summary",
     durationInSeconds: 6,
-    narration: "TODO",
+    narration:
+      "記住三件事：永遠驗證簽章、完整檢查 claims，而且不要把敏感資料放進 payload。JWT 證明完整性，不負責保密。",
   },
 ] as const satisfies readonly SceneSpec[];
 

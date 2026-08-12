@@ -7,24 +7,43 @@
 
 export const theme = {
   color: {
-    bg: "#0b0f19",
-    text: "#f5f7fa",
-    textMuted: "#9aa4b2",
-    accent: "#5b8def",
+    bg: "#07111f",
+    surface: "#0d1b2d",
+    surfaceRaised: "#13243a",
+    line: "#29405d",
+    text: "#f7fbff",
+    textMuted: "#8fa6bf",
+    accent: "#6c7cff",
+    cyan: "#37d9f2",
+    mint: "#42e2a8",
+    warning: "#ffca68",
+    danger: "#ff6b7a",
+    header: "#ff6f91",
+    payload: "#a887ff",
+    signature: "#54d5ff",
   },
   fontSize: {
-    sm: 28,
-    md: 44,
+    xs: 20,
+    sm: 26,
+    md: 42,
     lg: 72,
+    xl: 104,
   },
   spacing: {
     sm: 16,
     md: 32,
     lg: 64,
+    xl: 96,
   },
   duration: {
     fast: 15, // frames
     normal: 30,
     slow: 45,
+  },
+  radius: {
+    sm: 14,
+    md: 24,
+    lg: 36,
+    pill: 999,
   },
 } as const;

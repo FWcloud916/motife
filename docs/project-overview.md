@@ -20,7 +20,7 @@ Depends on an LLM provider for structured-output DSL generation and vision-based
 
 ### 1.3 Deprecated / Retired or Not-Yet-Enabled Features
 
-A Phase 0 scaffold exists: one hand-built Remotion composition (`JwtAuthFlow`, `src/remotion/compositions/jwt-auth/`) with placeholder scene content, and a working `pnpm verify` gate. No DSL, compiler, TTS integration, or agent pipeline exists yet. A second render target (a custom Rust engine using `vello`/`skia-safe`) is explicitly deferred to Phase 5, conditional on product validation and render cost/speed becoming a bottleneck — and, per Remotion's license, would have to be a clean-room implementation against the DSL spec rather than a port of Remotion's own source (source: [motife-plan.md](../motife-plan.md) §3 Phase 5; Remotion LICENSE.md).
+A Phase 0 hand-built baseline exists: one 40-second Remotion composition (`JwtAuthFlow`, `src/remotion/compositions/jwt-auth/`) with four finished scenes (intro, token anatomy, server-side verification, and summary), a primitive inventory, three committed reference stills, and a working `pnpm verify` gate. Its narration copy and provisional scene durations live in `storyboard.ts`, but narration audio is intentionally deferred until Phase 3's TTS-first timeline is implemented. No DSL, compiler, TTS integration, or agent pipeline exists yet. A second render target (a custom Rust engine using `vello`/`skia-safe`) is explicitly deferred to Phase 5, conditional on product validation and render cost/speed becoming a bottleneck — and, per Remotion's license, would have to be a clean-room implementation against the DSL spec rather than a port of Remotion's own source (source: [motife-plan.md](../motife-plan.md) §3 Phase 5; Remotion LICENSE.md).
 
 ## 2. Tech Stack
 
@@ -73,7 +73,8 @@ motife/
 │               ├── storyboard.ts      # pure data — prototype of the Phase 2 DSL step list
 │               ├── sceneRegistry.tsx  # SceneId -> component; missing entries are compile errors
 │               ├── JwtAuthFlow.tsx    # wiring only; zips storyboard x registry into <Sequence>s
-│               └── scenes/            # hand-authored scene content (Intro/Breakdown/Walkthrough/Summary)
+│               ├── visuals.tsx        # Phase 0-only repeated visual primitives and motion helpers
+│               └── scenes/            # finished hand-authored content (Intro/Breakdown/Walkthrough/Summary)
 ├── scripts/
 │   └── smoke.mjs                      # render smoke test — layer 3 of `pnpm verify`
 ├── public/                            # staticFile() assets (fonts, narration audio when added)

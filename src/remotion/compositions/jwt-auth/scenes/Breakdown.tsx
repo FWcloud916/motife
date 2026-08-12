@@ -1,22 +1,163 @@
-import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { theme } from "../../../theme";
+import {
+  Caption,
+  Card,
+  GridBackdrop,
+  Noise,
+  SceneHeader,
+  clamp,
+  enter,
+} from "../visuals";
 
-// Beat: 拆解 (breakdown). useCurrentFrame() here is RELATIVE to this
-// scene's enclosing <Sequence> in JwtAuthFlow.tsx — starts at frame 0.
-// Placeholder only: replace with the real breakdown animation.
+const PARTS = [
+  {
+    label: "HEADER",
+    value: "eyJhbGciOiJIUzI1NiJ9",
+    code: '{\n  "alg": "HS256",\n  "typ": "JWT"\n}',
+    color: theme.color.header,
+    note: "演算法與 token 類型",
+  },
+  {
+    label: "PAYLOAD",
+    value: "eyJzdWIiOiI0MiJ9",
+    code: '{\n  "sub": "user_42",\n  "role": "admin",\n  "exp": 1786507200\n}',
+    color: theme.color.payload,
+    note: "Claims：身分與權限資料",
+  },
+  {
+    label: "SIGNATURE",
+    value: "SflKxwRJSMeKKF2QT4fwpMeJf36",
+    code: "HMACSHA256(\n  base64(header) + '.' +\n  base64(payload), secret\n)",
+    color: theme.color.signature,
+    note: "證明內容未被竄改",
+  },
+] as const;
+
 export const Breakdown: React.FC = () => {
   const frame = useCurrentFrame();
+  const tokenIn = enter(frame, 25);
+
   return (
     <AbsoluteFill
       style={{
-        alignItems: "center",
-        justifyContent: "center",
-        color: theme.color.text,
-        fontSize: theme.fontSize.md,
-        fontFamily: "sans-serif",
+        fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+        overflow: "hidden",
       }}
     >
-      breakdown — frame {frame}
+      <GridBackdrop glow={theme.color.payload} />
+      <Noise />
+      <SceneHeader eyebrow="01 · Anatomy" title="JWT 裡面有什麼？" frame={frame} />
+
+      <div
+        style={{
+          position: "absolute",
+          top: 242,
+          left: 96,
+          right: 96,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          opacity: tokenIn,
+          transform: `scale(${interpolate(tokenIn, [0, 1], [0.96, 1], clamp)})`,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: 25,
+          fontWeight: 650,
+        }}
+      >
+        {PARTS.map((part, index) => (
+          <div key={part.label} style={{ display: "flex", alignItems: "center" }}>
+            <span style={{ color: part.color }}>{part.value}</span>
+            {index < PARTS.length - 1 ? (
+              <span style={{ color: theme.color.textMuted, margin: "0 12px" }}>.</span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          top: 330,
+          left: 96,
+          right: 96,
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 26,
+        }}
+      >
+        {PARTS.map((part, index) => {
+          const progress = enter(frame, 58 + index * 34);
+          return (
+            <Card
+              key={part.label}
+              accent={part.color}
+              style={{
+                minHeight: 410,
+                padding: 30,
+                opacity: progress,
+                transform: `translateY(${interpolate(progress, [0, 1], [34, 0], clamp)}px)`,
+              }}
+            >
+              <div
+                style={{
+                  color: part.color,
+                  fontSize: 20,
+                  fontWeight: 850,
+                  letterSpacing: 3,
+                  marginBottom: 26,
+                }}
+              >
+                0{index + 1} / {part.label}
+              </div>
+              <pre
+                style={{
+                  color: theme.color.text,
+                  fontSize: index === 1 ? 22 : 24,
+                  lineHeight: 1.55,
+                  margin: 0,
+                  minHeight: 232,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {part.code}
+              </pre>
+              <div
+                style={{
+                  color: theme.color.textMuted,
+                  fontSize: 21,
+                  borderTop: `1px solid ${theme.color.line}`,
+                  paddingTop: 20,
+                }}
+              >
+                {part.note}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          right: 96,
+          top: 76,
+          color: theme.color.warning,
+          background: `${theme.color.warning}12`,
+          border: `1px solid ${theme.color.warning}55`,
+          borderRadius: theme.radius.pill,
+          padding: "13px 20px",
+          fontSize: 21,
+          fontWeight: 700,
+          opacity: enter(frame, 175),
+        }}
+      >
+        ⚠ Payload 是編碼，不是加密
+      </div>
+
+      <Caption frame={frame}>
+        Header 和 Payload 任何人都能解碼；Signature 才是防竄改的關鍵。
+      </Caption>
     </AbsoluteFill>
   );
 };
