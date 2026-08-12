@@ -14,13 +14,15 @@
     "still": "remotion still src/remotion/index.ts JwtAuthFlow out/still.png",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
-    "check": "pnpm typecheck && pnpm lint",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
     "verify": "pnpm check && pnpm smoke",
     "upgrade:remotion": "remotion upgrade"
   },
   "dependencies": {
     "@remotion/cli": "4.0.508",
+    "@remotion/google-fonts": "4.0.508",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.508"
@@ -33,6 +35,7 @@
     "@types/web": "0.0.166",
     "eslint": "9.19.0",
     "prettier": "3.8.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.1.10"
   }
 }

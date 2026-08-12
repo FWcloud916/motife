@@ -1,6 +1,15 @@
 import { Composition } from "remotion";
+import { loadFonts } from "../components/tokens";
 import { JwtAuthFlow } from "./compositions/jwt-auth/JwtAuthFlow";
 import { FPS, WIDTH, HEIGHT, TOTAL_FRAMES } from "./compositions/jwt-auth/storyboard";
+
+// Registers every font the component library depends on (Inter, Noto Sans
+// TC, JetBrains Mono) before any composition below can mount. Called once
+// at module scope — @remotion/google-fonts handles delayRender() /
+// continueRender() internally, so every render pipeline (Studio,
+// renderStill, renderMedia) waits for real glyphs instead of falling back
+// to whatever font the host machine happens to have installed.
+loadFonts();
 
 // The fragment is intentional, not a leftover — @remotion/eslint-config-flat
 // disables react/jsx-no-useless-fragment specifically because more
