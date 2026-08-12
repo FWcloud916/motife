@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+
+# Remotion output
+out
+dist
+build
+
+# Remotion caches (also covered by node_modules, kept explicit for clarity)
+.remotion
+
+# Editor / OS
+.DS_Store
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Tooling caches
+.eslintcache
+*.tsbuildinfo
+
+# Ignore the output video from Git but not videos you import into src/

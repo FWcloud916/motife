@@ -1,0 +1,38 @@
+{
+  "name": "motife",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "remotion studio src/remotion/index.ts",
+    "build": "remotion bundle src/remotion/index.ts",
+    "render": "remotion render src/remotion/index.ts JwtAuthFlow out/jwt-auth-flow.mp4",
+    "still": "remotion still src/remotion/index.ts JwtAuthFlow out/still.png",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "pnpm typecheck && pnpm lint",
+    "verify": "pnpm check && pnpm smoke",
+    "upgrade:remotion": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.508",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.508"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.508",
+    "@remotion/eslint-config-flat": "4.0.508",
+    "@remotion/renderer": "4.0.508",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  }
+}
