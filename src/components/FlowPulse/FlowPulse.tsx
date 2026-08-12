@@ -75,9 +75,18 @@ export const FlowPulse: FC<FlowPulseProps> = ({ flow }) => {
       {flow.label ? (
         <text
           x={dot.x}
-          y={dot.y - 18}
+          y={dot.y - 22}
           textAnchor="middle"
           fill={accent}
+          // A short edge's midpoint can sit right on top of a node's icon
+          // (dagre routes to the node's boundary at its vertical center) —
+          // a background-colored stroke drawn behind the fill (paintOrder
+          // "stroke") gives the label a halo so it stays legible over
+          // whatever's underneath, without needing to measure text to
+          // place a real background rect.
+          stroke={tokens.color.bg}
+          strokeWidth={6}
+          paintOrder="stroke"
           fontFamily={tokens.fontFamily.sans}
           fontSize={tokens.fontSize.xs}
           fontWeight={700}
