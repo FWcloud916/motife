@@ -117,4 +117,4 @@ export const tokens = {
 
 export { easing } from "./easing";
 export type { EasingToken } from "./easing";
-export { loadFonts } from "./fonts";
+export { fontsReady, loadFonts } from "./fonts";

@@ -1,13 +1,10 @@
 import type { FC } from "react";
+import type { SceneComponentProps } from "../SceneSeries";
 import type { SceneId } from "./storyboard";
 import { Intro } from "./scenes/Intro";
 import { Breakdown } from "./scenes/Breakdown";
 import { Walkthrough } from "./scenes/Walkthrough";
 import { Summary } from "./scenes/Summary";
-
-export interface SceneComponentProps {
-  durationInFrames: number;
-}
 
 /**
  * Record<SceneId, FC<SceneComponentProps>> is the wiring guarantee: a

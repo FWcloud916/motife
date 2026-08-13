@@ -4,6 +4,9 @@
 // React/JSX means it stays serializable in spirit, which is the point:
 // Phase 2's compiler will consume something shaped exactly like SCENES.
 
+import { buildTimeline, totalFrames } from "../timeline";
+import type { SceneTransition, TimelineEntry } from "../timeline";
+
 export const FPS = 30;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
@@ -25,6 +28,15 @@ interface SceneSpec {
   /** Provisional. Not read by any component yet — recorded now so the
    * per-scene narration text exists in one place before TTS lands. */
   narration: string;
+  /**
+   * Transition into the next scene; defaults to "cut". Every boundary here
+   * is deliberately left a cut: the eval-set regression policy
+   * (motife-plan.md §4) compares this video frame-for-frame against the
+   * Phase 0 baseline, and a fade would shift every subsequent frame by
+   * borrowing time from both neighbours. ComponentGallery is where a real
+   * fade is exercised.
+   */
+  transitionToNext?: SceneTransition;
 }
 
 export const SCENES = [
@@ -62,27 +74,9 @@ export const SCENES = [
  * its entry in sceneRegistry.tsx is a compile error, not a blank screen. */
 export type SceneId = (typeof SCENES)[number]["id"];
 
-interface TimelineEntry {
-  id: SceneId;
-  from: number;
-  durationInFrames: number;
-}
+// Transition-aware (see ../timeline.ts). With every boundary a cut — as
+// SCENES declares — this produces exactly the running-sum timeline and
+// 1200-frame total the Phase 0 baseline had; storyboard.test.ts pins that.
+export const TIMELINE: TimelineEntry<SceneId>[] = buildTimeline(SCENES, FPS);
 
-function buildTimeline(): TimelineEntry[] {
-  let cursor = 0;
-  return SCENES.map((scene) => {
-    const durationInFrames = Math.round(scene.durationInSeconds * FPS);
-    const entry: TimelineEntry = { id: scene.id, from: cursor, durationInFrames };
-    cursor += durationInFrames;
-    return entry;
-  });
-}
-
-export const TIMELINE: TimelineEntry[] = buildTimeline();
-
-// Math.max(1, ...) so an empty SCENES list still yields a legal
-// composition ("empty but runs") instead of a zero-duration error.
-export const TOTAL_FRAMES = Math.max(
-  1,
-  TIMELINE.reduce((sum, entry) => sum + entry.durationInFrames, 0),
-);
+export const TOTAL_FRAMES = totalFrames(TIMELINE);

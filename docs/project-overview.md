@@ -70,22 +70,27 @@ motife/
 │   │   ├── tokens/                    # color/Tone recipes, fontFamily, easing, spacing, fonts.ts
 │   │   ├── motion/                    # pure timing/reveal helpers (Window -> frames, step state)
 │   │   ├── icons/                     # semantic IconName registry
-│   │   ├── layout/                    # computeLayout() — GraphSpec -> LayoutResult via dagre
+│   │   ├── layout/                    # computeLayout() — GraphSpec -> LayoutResult via dagre;
+│   │   │                              #   nodeSizing/measureNodes size cards from real text
 │   │   └── Scene/ Diagram/ FlowPulse/ CodeBlock/ Terminal/ Camera/ StepReveal/ Callout/
 │   └── remotion/                      # Remotion entry point (CLI entry-point search hits this
 │       │                              #   path with zero config; MUST NOT add src/index.ts, see AGENTS.md)
 │       ├── index.ts                   # registerRoot(RemotionRoot)
 │       ├── Root.tsx                   # <Composition/> registrations; calls loadFonts() once
 │       └── compositions/
+│           ├── timeline.ts            # pure scene/transition timing shared by all compositions
+│           ├── SceneSeries.tsx        # renders a timeline as a TransitionSeries (cut / fade)
 │           ├── jwt-auth/              # first eval-set video — rebuilt in Phase 1 from
 │           │                          #   src/components/ (see progress/2026-08-13-phase-1-...)
 │           │   ├── storyboard.ts      # pure data — prototype of the Phase 2 DSL step list
 │           │   ├── sceneRegistry.tsx  # SceneId -> component; missing entries are compile errors
-│           │   ├── JwtAuthFlow.tsx    # wiring only; zips storyboard x registry into a
-│           │   │                      #   TransitionSeries (hard cuts — no transitions configured)
+│           │   ├── JwtAuthFlow.tsx    # wiring only; zips storyboard x registry via SceneSeries
+│           │   │                      #   (all boundaries are cuts — a regression-policy choice)
 │           │   └── scenes/            # Intro/Breakdown/Walkthrough/Summary, component-library only
 │           └── gallery/               # ComponentGallery — demo composition exercising all 8
-│                                       #   components, ensures pnpm smoke covers Terminal/Camera
+│                                       #   components; also the only place a fade transition,
+│                                       #   a CJK-measured node, and CameraTarget are rendered,
+│                                       #   so pnpm smoke covers all three
 ├── scripts/
 │   └── smoke.mjs                      # render smoke test — layer 3 of `pnpm verify`;
 │                                       #   smokes every registered composition

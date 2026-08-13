@@ -1,13 +1,17 @@
 import type { FC, ReactNode } from "react";
-import { useContext, useEffect, useMemo } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { cancelRender, continueRender, delayRender } from "remotion";
 import { CameraRegistryContext, DIAGRAM_BOUNDS_ID } from "../Camera/CameraRegistryContext";
 import { FlowPulse } from "../FlowPulse/FlowPulse";
 import type { FlowSpec } from "../FlowPulse/FlowPulse";
 import { computeLayout } from "../layout/computeLayout";
+import { measureGraphNodeSizes } from "../layout/measureNodes";
+import type { NodeSize } from "../layout/nodeSizing";
 import type { GraphSpec } from "../layout/types";
 import { stagger } from "../motion/progress";
 import { resolveWindow } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
+import { fontsReady } from "../tokens";
 import type { Window } from "../tokens";
 import { tokens } from "../tokens";
 import { DiagramContext } from "./DiagramContext";
@@ -60,7 +64,33 @@ export const Diagram: FC<DiagramProps> = ({
   flows = [],
   children,
 }) => {
-  const layout = useMemo(() => computeLayout(graph), [graph]);
+  // Node footprints measured from the real rendered text, so a long label
+  // (CJK especially — every glyph is full-width) widens its card instead of
+  // spilling out of it. Gated on fontsReady(): measuring before the font
+  // files land would capture fallback-font metrics and cache a wrong width
+  // forever. The delayRender handle guarantees no frame is screenshotted
+  // while the interim token-sized layout is on screen — Studio may show a
+  // single-commit flash of it, which is acceptable for a live preview.
+  const [measuredSizes, setMeasuredSizes] = useState<Record<string, NodeSize> | null>(null);
+  useEffect(() => {
+    const handle = delayRender("Diagram: measuring node labels");
+    let cancelled = false;
+    fontsReady()
+      .then(() => {
+        if (!cancelled) setMeasuredSizes(measureGraphNodeSizes(graph));
+        continueRender(handle);
+      })
+      .catch((error) => cancelRender(error));
+    return () => {
+      cancelled = true;
+      continueRender(handle);
+    };
+  }, [graph]);
+
+  const layout = useMemo(
+    () => computeLayout(graph, measuredSizes ?? undefined),
+    [graph, measuredSizes],
+  );
   const { durationInFrames } = useSceneTiming();
 
   // A <Diagram> nested inside a <Camera> hands framing over entirely to

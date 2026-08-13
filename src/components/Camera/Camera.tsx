@@ -1,11 +1,18 @@
 import type { FC, ReactNode } from "react";
-import { useCallback, useContext, useMemo, useState } from "react";
-import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  cancelRender,
+  continueRender,
+  delayRender,
+  interpolate,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import { clampExtrapolate } from "../motion/progress";
 import { resolveWindow } from "../motion/timing";
 import type { FrameRange } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
-import { easing } from "../tokens";
+import { easing, fontsReady } from "../tokens";
 import type { Window } from "../tokens";
 import { CameraRegistryContext, DIAGRAM_BOUNDS_ID } from "./CameraRegistryContext";
 import type { TargetRect } from "./CameraRegistryContext";
@@ -57,29 +64,78 @@ function lerpRect(a: TargetRect, b: TargetRect, t: number): TargetRect {
  * content (no extra `position`-ed wrapper in between) for the offset math
  * to line up.
  *
- * Open item: like Diagram's old `fit` implementation, this is a one-shot
- * ref measurement and could in principle observe a stale pre-layout size.
- * Diagram's node-focus path (the primary, recommended one) no longer has
- * this risk; CameraTarget remains the documented fallback until a real
- * scene exercises it enough to either prove it out or replace it with a
- * measurement-free technique.
+ * Note that CameraTarget ids share one namespace with the Diagram node ids
+ * registered by any Diagram nested in the same Camera — don't reuse a node
+ * id for a target.
+ *
+ * ## Why the measurement looks like this
+ *
+ * Reading `offsetWidth` on mount is exactly the shape of bug that made
+ * Diagram's original `fit` scaling non-deterministic: in the real
+ * renderStill pipeline the first measurement can land before layout has
+ * settled, and nothing ever corrects it. Two things fix it here.
+ *
+ * `fontsReady()` gates the measurement, because fonts are the only async
+ * resource in this library that moves layout, and a font swap can shift a
+ * target's POSITION without changing its size (which is also why a
+ * ResizeObserver would be the wrong tool — it would never fire).
+ *
+ * A `delayRender` handle, taken eagerly at mount, holds the render until
+ * that first post-fonts measurement lands, so no frame can be captured
+ * against an unregistered or stale rect. After that the effect re-measures
+ * on every commit — the registry dedupes identical rects, so the steady
+ * state is a no-op, and anything that moves the target later is picked up.
  */
 export const CameraTarget: FC<{ id: string; children: ReactNode }> = ({ id, children }) => {
   const registry = useContext(CameraRegistryContext);
-  const measureRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (node && registry) {
-        registry.register(id, {
-          x: node.offsetLeft,
-          y: node.offsetTop,
-          width: node.offsetWidth,
-          height: node.offsetHeight,
-        });
-      }
-    },
-    [id, registry],
+  const ref = useRef<HTMLDivElement>(null);
+  // Labelled with the id so a hung target names itself in the timeout error.
+  const [handle] = useState(() => delayRender(`<CameraTarget id="${id}"> initial measurement`));
+  const settled = useRef(false);
+  const settle = useCallback(() => {
+    if (!settled.current) {
+      settled.current = true;
+      continueRender(handle);
+    }
+  }, [handle]);
+
+  // Deliberately no dependency array: re-measure after every commit.
+  useEffect(() => {
+    let cancelled = false;
+    fontsReady()
+      .then(() => {
+        if (cancelled) return;
+        const node = ref.current;
+        if (node && registry) {
+          registry.register(id, {
+            x: node.offsetLeft,
+            y: node.offsetTop,
+            width: node.offsetWidth,
+            height: node.offsetHeight,
+          });
+        }
+        settle();
+      })
+      .catch((error) => cancelRender(error));
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  // Release the handle on unmount so a target that disappears before it
+  // ever measured can't hang the render until the 30s timeout.
+  useEffect(() => settle, [settle]);
+
+  // inline-block so the wrapper shrink-wraps its content. A plain block div
+  // would measure the full width of Camera's content area no matter how
+  // small the thing inside is, and "focus on this" would then resolve to a
+  // box far wider than the subject — the camera centres correctly but
+  // frames the whole row, which reads as a broken shot.
+  return (
+    <div ref={ref} style={{ display: "inline-block" }}>
+      {children}
+    </div>
   );
-  return <div ref={measureRef}>{children}</div>;
 };
 
 function focusRectFor(

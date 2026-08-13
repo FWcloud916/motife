@@ -81,3 +81,33 @@ describe("computeLayout", () => {
     expect(Object.keys(result.edges)).toEqual([]);
   });
 });
+
+// The measured-size path (measureNodes.ts) is browser-only, so these cover
+// the contract it feeds: computeLayout must honour an injected footprint
+// and fall back to the Size token for anything not measured.
+describe("computeLayout — injected node sizes", () => {
+  it("uses an injected footprint for the node it names", () => {
+    const result = computeLayout(THREE_NODE_CHAIN, { server: { width: 500, height: 300 } });
+    expect(result.nodes.server.width).toBe(500);
+    expect(result.nodes.server.height).toBe(300);
+  });
+
+  it("falls back to the Size token for nodes with no override", () => {
+    const result = computeLayout(THREE_NODE_CHAIN, { server: { width: 500, height: 300 } });
+    expect(result.nodes.browser.width).toBe(268);
+    expect(result.nodes.browser.height).toBe(228);
+  });
+
+  it("widens the overall layout when a node is widened", () => {
+    const base = computeLayout(THREE_NODE_CHAIN);
+    const wide = computeLayout(THREE_NODE_CHAIN, { server: { width: 500, height: 228 } });
+    expect(wide.width).toBeGreaterThan(base.width);
+  });
+
+  it("stays deterministic with overrides applied", () => {
+    const sizes = { server: { width: 500, height: 300 } };
+    expect(computeLayout(THREE_NODE_CHAIN, sizes)).toEqual(
+      computeLayout(THREE_NODE_CHAIN, sizes),
+    );
+  });
+});

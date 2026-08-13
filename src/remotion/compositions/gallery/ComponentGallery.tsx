@@ -6,30 +6,51 @@
 // baseline barely uses them (docs/primitive-inventory.md: 0 uses each at
 // Phase 0 exit).
 import type { FC } from "react";
-import { AbsoluteFill, Sequence } from "remotion";
+import { AbsoluteFill } from "remotion";
 import {
+  Callout,
   Camera,
+  CameraTarget,
   CodeBlock,
   Diagram,
   Scene,
   Terminal,
 } from "../../../components";
 import type { GraphSpec } from "../../../components";
+import { SceneSeries } from "../SceneSeries";
+import type { SceneComponentProps } from "../SceneSeries";
+import { buildTimeline, totalFrames } from "../timeline";
 import { FPS } from "../jwt-auth/storyboard";
 
-const DIAGRAM_FRAMES = 5 * FPS;
-const CODE_FRAMES = 5 * FPS;
-const TERMINAL_FRAMES = 5 * FPS;
-const CAMERA_FRAMES = 6 * FPS;
+// The gallery is also where a non-cut transition is actually rendered:
+// the eval-set videos all use hard cuts (regression policy), so without a
+// fade here the transition path would ship untested. `pnpm smoke` samples
+// this composition every run.
+const GALLERY_SCENES = [
+  { id: "diagram", durationInSeconds: 5, transitionToNext: "fade" as const },
+  { id: "code", durationInSeconds: 5 },
+  { id: "terminal", durationInSeconds: 5 },
+  { id: "camera", durationInSeconds: 6 },
+] as const;
 
-export const GALLERY_TOTAL_FRAMES = DIAGRAM_FRAMES + CODE_FRAMES + TERMINAL_FRAMES + CAMERA_FRAMES;
+type GallerySceneId = (typeof GALLERY_SCENES)[number]["id"];
+
+const GALLERY_TIMELINE = buildTimeline(GALLERY_SCENES, FPS);
+
+/** 615, not 630: the one fade boundary overlaps its two neighbours by
+ * TRANSITION_FRAMES, and buildTimeline accounts for it. */
+export const GALLERY_TOTAL_FRAMES = totalFrames(GALLERY_TIMELINE);
 
 const DEMO_GRAPH: GraphSpec = {
   direction: "right",
   nodes: [
     { id: "client", icon: "browser", label: "Client", tone: "info" },
     { id: "queue", icon: "queue", label: "Queue", tone: "primary" },
-    { id: "worker", icon: "server", label: "Worker", tone: "success" },
+    // The CJK detail is deliberate and permanent: it is far wider than the
+    // `md` Size token, so this node only fits if Diagram's text measurement
+    // is working. Every `pnpm smoke` run therefore exercises the measured
+    // sizing path — a regression shows up as a spilling card, not silence.
+    { id: "worker", icon: "server", label: "Worker", detail: "非同步工作處理器", tone: "success" },
   ],
   edges: [
     { from: "client", to: "queue", label: "publish" },
@@ -37,9 +58,9 @@ const DEMO_GRAPH: GraphSpec = {
   ],
 };
 
-const DiagramDemo: FC = () => (
+const DiagramDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={DIAGRAM_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "primary" }}
     header={{ eyebrow: "Component Gallery", title: "Diagram + FlowPulse" }}
   >
@@ -67,9 +88,9 @@ const CODE_LINES = [
   { segments: ["}"] },
 ];
 
-const CodeBlockDemo: FC = () => (
+const CodeBlockDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={CODE_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "info" }}
     header={{ eyebrow: "Component Gallery", title: "CodeBlock" }}
   >
@@ -86,9 +107,9 @@ const CodeBlockDemo: FC = () => (
   </Scene>
 );
 
-const TerminalDemo: FC = () => (
+const TerminalDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={TERMINAL_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "success" }}
     header={{ eyebrow: "Component Gallery", title: "Terminal" }}
   >
@@ -114,18 +135,22 @@ const TerminalDemo: FC = () => (
   </Scene>
 );
 
-const CameraDemo: FC = () => (
+const CameraDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={CAMERA_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "warning" }}
     header={{ eyebrow: "Component Gallery", title: "Camera" }}
   >
     <Camera
       shots={[
         { window: { from: 0, to: 0.01 }, focus: "all", zoom: "wide" },
-        { window: { from: 0.15, to: 0.4 }, focus: { node: "client" }, zoom: "close" },
-        { window: { from: 0.5, to: 0.75 }, focus: { node: "worker" }, zoom: "close" },
-        { window: { from: 0.85, to: 1 }, focus: "all", zoom: "wide" },
+        { window: { from: 0.12, to: 0.32 }, focus: { node: "client" }, zoom: "close" },
+        { window: { from: 0.42, to: 0.62 }, focus: { node: "worker" }, zoom: "close" },
+        // Ends on the CameraTarget rather than a wide shot, on purpose:
+        // smoke samples the final frame of every composition, so a
+        // regression in CameraTarget's measurement shows up as a
+        // mis-framed still instead of passing unnoticed.
+        { window: { from: 0.75, to: 0.92 }, focus: { target: "camera-note" }, zoom: "medium" },
       ]}
     >
       {/* No centering/sizing wrapper here on purpose — a Diagram nested in
@@ -134,26 +159,32 @@ const CameraDemo: FC = () => (
           space. Any offsetting wrapper in between would desync the two;
           Camera's own shots (not CSS) are what frame the content. */}
       <Diagram graph={DEMO_GRAPH} reveal={{ window: { from: 0, to: 0.05 } }} />
+      {/* Direct child of Camera's content, no positioned wrapper between —
+          CameraTarget measures offsetLeft/offsetTop, so an intervening
+          offset parent would desync the registered rect from where this
+          actually renders. */}
+      <CameraTarget id="camera-note">
+        <Callout
+          variant="banner"
+          tone="warning"
+          icon="document"
+          text="CameraTarget"
+          detail="focus by id, measured after fonts settle"
+        />
+      </CameraTarget>
     </Camera>
   </Scene>
 );
 
+const GALLERY_COMPONENTS: Record<GallerySceneId, FC<SceneComponentProps>> = {
+  diagram: DiagramDemo,
+  code: CodeBlockDemo,
+  terminal: TerminalDemo,
+  camera: CameraDemo,
+};
+
 export const ComponentGallery: FC = () => (
   <AbsoluteFill>
-    <Sequence durationInFrames={DIAGRAM_FRAMES}>
-      <DiagramDemo />
-    </Sequence>
-    <Sequence from={DIAGRAM_FRAMES} durationInFrames={CODE_FRAMES}>
-      <CodeBlockDemo />
-    </Sequence>
-    <Sequence from={DIAGRAM_FRAMES + CODE_FRAMES} durationInFrames={TERMINAL_FRAMES}>
-      <TerminalDemo />
-    </Sequence>
-    <Sequence
-      from={DIAGRAM_FRAMES + CODE_FRAMES + TERMINAL_FRAMES}
-      durationInFrames={CAMERA_FRAMES}
-    >
-      <CameraDemo />
-    </Sequence>
+    <SceneSeries timeline={GALLERY_TIMELINE} components={GALLERY_COMPONENTS} />
   </AbsoluteFill>
 );
