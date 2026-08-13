@@ -12,7 +12,11 @@ const MONO_WEIGHTS = ["400", "600", "700"] as const;
 // this only if a real scene needs an intermediate CJK weight.
 const CJK_WEIGHTS = ["400", "700"] as const;
 
-let loaded = false;
+interface FontHandle {
+  waitUntilDone: () => Promise<unknown>;
+}
+
+let handles: FontHandle[] | null = null;
 
 /**
  * Registers every font the component library depends on: Inter (Latin UI
@@ -24,15 +28,34 @@ let loaded = false;
  * had. Call once, before RemotionRoot mounts; idempotent for safety.
  */
 export function loadFonts(): void {
-  if (loaded) return;
-  loaded = true;
-  loadInter("normal", { weights: [...SANS_WEIGHTS], subsets: ["latin"] });
-  loadNotoSansTC("normal", {
-    weights: [...CJK_WEIGHTS],
-    subsets: ["chinese-traditional"],
-    // The request count above is an accepted, documented trade-off (see
-    // CJK_WEIGHTS comment), not an oversight — silence the per-render nag.
-    ignoreTooManyRequestsWarning: true,
-  });
-  loadJetBrainsMono("normal", { weights: [...MONO_WEIGHTS], subsets: ["latin"] });
+  if (handles) return;
+  handles = [
+    loadInter("normal", { weights: [...SANS_WEIGHTS], subsets: ["latin"] }),
+    loadNotoSansTC("normal", {
+      weights: [...CJK_WEIGHTS],
+      subsets: ["chinese-traditional"],
+      // The request count above is an accepted, documented trade-off (see
+      // CJK_WEIGHTS comment), not an oversight — silence the per-render nag.
+      ignoreTooManyRequestsWarning: true,
+    }),
+    loadJetBrainsMono("normal", { weights: [...MONO_WEIGHTS], subsets: ["latin"] }),
+  ];
+}
+
+/**
+ * Resolves once every registered font's files have actually arrived.
+ *
+ * loadFonts()'s internal delayRender blocks the *screenshot*, but React
+ * mounts and runs effects well before the font files land. Anything that
+ * MEASURES rendered text (Diagram's node sizing, CameraTarget's offset
+ * read) must therefore wait on this, not merely on mount — otherwise it
+ * measures fallback-font metrics and caches a wrong answer that no later
+ * frame corrects.
+ *
+ * Idempotent, and calls loadFonts() itself so a caller can't race an
+ * un-issued load.
+ */
+export function fontsReady(): Promise<void> {
+  loadFonts();
+  return Promise.all(handles!.map((handle) => handle.waitUntilDone())).then(() => undefined);
 }

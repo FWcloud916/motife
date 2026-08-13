@@ -28,5 +28,6 @@ minimumReleaseAgeExclude:
   - remotion@4.0.508
   - '@remotion/eslint-config-flat@4.0.508'
   - '@remotion/google-fonts@4.0.508'
+  - '@remotion/layout-utils@4.0.508'
   - '@remotion/paths@4.0.508'
   - '@remotion/transitions@4.0.508'

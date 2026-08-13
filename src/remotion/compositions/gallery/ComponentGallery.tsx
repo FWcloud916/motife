@@ -44,7 +44,11 @@ const DEMO_GRAPH: GraphSpec = {
   nodes: [
     { id: "client", icon: "browser", label: "Client", tone: "info" },
     { id: "queue", icon: "queue", label: "Queue", tone: "primary" },
-    { id: "worker", icon: "server", label: "Worker", tone: "success" },
+    // The CJK detail is deliberate and permanent: it is far wider than the
+    // `md` Size token, so this node only fits if Diagram's text measurement
+    // is working. Every `pnpm smoke` run therefore exercises the measured
+    // sizing path — a regression shows up as a spilling card, not silence.
+    { id: "worker", icon: "server", label: "Worker", detail: "非同步工作處理器", tone: "success" },
   ],
   edges: [
     { from: "client", to: "queue", label: "publish" },

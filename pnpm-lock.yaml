@@ -17,6 +17,9 @@ importers:
       '@remotion/google-fonts':
         specifier: 4.0.508
         version: 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@remotion/layout-utils':
+        specifier: 4.0.508
+        version: 4.0.508
       '@remotion/paths':
         specifier: 4.0.508
         version: 4.0.508
@@ -500,6 +503,9 @@ packages:
 
   '@remotion/google-fonts@4.0.508':
     resolution: {integrity: sha512-j6fW/hQNcBsDz//aBh4igUKCYKYdr14Gwl0AEhagUJyf8NmD6wit/0XMY5/sN9AVSCwURirMymkqHNg+AiVbJQ==}
+
+  '@remotion/layout-utils@4.0.508':
+    resolution: {integrity: sha512-87oXx1vpU3IlZNyGs7jJGxV04xH8me2sHR9e/w6FE5lUJ3+OEkCAgjlLPEO+l8PfP5x4tTcIf/oHtgtnGKnODQ==}
 
   '@remotion/licensing@4.0.508':
     resolution: {integrity: sha512-S9w6lckixF0tYc3wcnh1zLACPl0AgG9v/QGOYqkkaZX/p+F86202+YMWKAHdMiCQPEYntTfCgIfnqucGuLoWeA==}
@@ -2585,6 +2591,8 @@ snapshots:
     transitivePeerDependencies:
       - react
       - react-dom
+
+  '@remotion/layout-utils@4.0.508': {}
 
   '@remotion/licensing@4.0.508': {}
 

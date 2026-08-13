@@ -53,6 +53,14 @@ export const DiagramNode: FC<DiagramNodeProps> = ({
         boxShadow: active
           ? `0 0 0 1px ${accent}55, 0 25px 80px ${accent}22`
           : "0 25px 70px #0007",
+        // Guardrail behind the measured sizing: a label past MAX_NODE_WIDTH
+        // stops widening its card and has to wrap instead. The padding
+        // keeps wrapped text off the border, and `overflow: hidden` is the
+        // last resort for text that still can't fit (clipping is ugly, but
+        // it is contained — spilling across a neighbouring node is worse).
+        padding: `0 ${tokens.spacing.sm}px`,
+        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
       {icon ? (
@@ -76,6 +84,14 @@ export const DiagramNode: FC<DiagramNodeProps> = ({
           color: tokens.color.text,
           fontSize: tokens.fontSize.sm,
           fontWeight: 750,
+          maxWidth: "100%",
+          textAlign: "center",
+          // "anywhere" rather than break-word: CJK wraps natively either
+          // way, but this also breaks an unbroken Latin run (a URL, a long
+          // identifier), which is the residual overflow case once width is
+          // measured and capped.
+          overflowWrap: "anywhere",
+          lineHeight: 1.25,
         }}
       >
         {label}
@@ -86,6 +102,10 @@ export const DiagramNode: FC<DiagramNodeProps> = ({
             fontFamily: tokens.fontFamily.sans,
             color: tokens.color.textMuted,
             fontSize: tokens.fontSize.xs,
+            maxWidth: "100%",
+            textAlign: "center",
+            overflowWrap: "anywhere",
+            lineHeight: 1.25,
           }}
         >
           {detail}
