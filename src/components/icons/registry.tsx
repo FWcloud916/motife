@@ -6,18 +6,25 @@ import type { ReactNode } from "react";
 // from Phase 0's visuals.tsx verbatim; the rest cover the eval set's other
 // two videos (MQ backpressure → queue/lock; DB index → database/document)
 // plus the StepReveal failure state (cross).
-export type IconName =
-  | "browser"
-  | "server"
-  | "key"
-  | "shield"
-  | "check"
-  | "cross"
-  | "user"
-  | "database"
-  | "queue"
-  | "lock"
-  | "document";
+//
+// A runtime array, not just a type, so the Phase 2 DSL schema can build a
+// zod enum from it (`z.enum(ICON_NAMES)`) instead of hand-duplicating this
+// list — the same pattern tokens/index.ts already uses for TONE_NAMES.
+export const ICON_NAMES = [
+  "browser",
+  "server",
+  "key",
+  "shield",
+  "check",
+  "cross",
+  "user",
+  "database",
+  "queue",
+  "lock",
+  "document",
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];
 
 // Each entry is the inner shape only (no fill, no stroke, no <svg> wrapper)
 // — Icon.tsx supplies those so every icon shares one 48x48 viewBox and one

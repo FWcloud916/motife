@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { resolveSteps, resolveWindow, stepStateAtFrame } from "./timing";
-import type { StepFrameRange } from "./timing";
+import { resolveSteps, resolveWindow, stepStateAtFrame, stepWindows } from "./timing";
+import type { StepFrameRange, WeightedStep } from "./timing";
+import type { Window } from "../tokens";
 
 describe("resolveWindow", () => {
   it("maps fractional bounds onto absolute frames", () => {
@@ -72,6 +73,51 @@ describe("resolveSteps", () => {
       100,
     );
     expect(ranges.map((r) => r.outcome)).toEqual(["pass", "fail"]);
+  });
+});
+
+describe("stepWindows", () => {
+  it("agrees with resolveSteps at several durations — the duration-independent counterpart", () => {
+    const steps: WeightedStep[] = [{ weight: 1 }, { weight: 2 }, { weight: 1 }];
+    const window: Window = { from: 0.1, to: 0.9 };
+
+    for (const durationInFrames of [30, 90, 600, 1200]) {
+      const fromResolveSteps = resolveSteps(steps, window, durationInFrames).map((range) => ({
+        from: range.startFrame / durationInFrames,
+        to: range.endFrame / durationInFrames,
+      }));
+      const fromStepWindows = stepWindows(steps, window);
+      fromStepWindows.forEach((w, index) => {
+        expect(w.from).toBeCloseTo(fromResolveSteps[index].from, 10);
+        expect(w.to).toBeCloseTo(fromResolveSteps[index].to, 10);
+      });
+    }
+  });
+
+  it("splits a window evenly when steps carry no explicit weight", () => {
+    const windows = stepWindows([{}, {}, {}], { from: 0, to: 1 });
+    expect(windows).toEqual([
+      { from: 0, to: 1 / 3 },
+      { from: 1 / 3, to: 2 / 3 },
+      { from: 2 / 3, to: 1 },
+    ]);
+  });
+
+  it("splits proportionally to weight, within the given window", () => {
+    const windows = stepWindows([{ weight: 1 }, { weight: 3 }], { from: 0.2, to: 0.6 });
+    expect(windows).toEqual([
+      { from: 0.2, to: 0.3 },
+      { from: 0.3, to: 0.6 },
+    ]);
+  });
+
+  it("returns an empty array for an empty step list", () => {
+    expect(stepWindows([], { from: 0, to: 1 })).toEqual([]);
+  });
+
+  it("does not divide by zero when every weight is zero", () => {
+    const windows = stepWindows([{ weight: 0 }, { weight: 0 }], { from: 0, to: 1 });
+    expect(windows.every((w) => Number.isFinite(w.from) && Number.isFinite(w.to))).toBe(true);
   });
 });
 

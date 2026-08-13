@@ -1,18 +1,9 @@
-// Phase 1 acceptance rebuild of scenes/Intro.tsx — component-library only,
-// hand-written props (motife-plan.md §3 Phase 1 acceptance: rebuild the
-// baseline video from the library at quality no worse than the manual
-// version). See ../scenes/Intro.tsx for the original.
+// Phase 2 rewrite of Intro.tsx, using only the Stage 1 semantic primitives
+// (Stack/Text/Diagram/CodeBlock/Callout) — zero raw `<div style>`, zero
+// useCurrentFrame(). This is the shape the Phase 2 DSL will emit directly;
+// see docs/component-library.md for the primitive reference.
 import type { FC } from "react";
-import { interpolate, useCurrentFrame } from "remotion";
-import {
-  Callout,
-  CodeBlock,
-  Diagram,
-  Scene,
-  clampExtrapolate,
-  reveal,
-  tokens,
-} from "../../../../components";
+import { Callout, CodeBlock, Diagram, Scene, Stack, Text } from "../../../../components";
 import type { GraphSpec } from "../../../../components";
 
 interface SceneProps {
@@ -28,86 +19,42 @@ const GRAPH: GraphSpec = {
   edges: [{ from: "client", to: "authServer", label: "LOGIN" }],
 };
 
-export const Intro: FC<SceneProps> = ({ durationInFrames }) => {
-  const frame = useCurrentFrame();
-  const titleIn = reveal(frame, 4);
+export const Intro: FC<SceneProps> = ({ durationInFrames }) => (
+  <Scene
+    durationInFrames={durationInFrames}
+    background={{ variant: "grid", glow: "success" }}
+    caption="登入成功後，伺服器簽發 JWT；之後每次請求都帶著它證明身分。"
+  >
+    <Stack grow align="center" justify="center" gap="lg">
+      <Stack align="center" gap="sm">
+        <Callout variant="pill" tone="success" text="AUTHENTICATION, EXPLAINED" />
+        <Text role="hero" content="JWT 驗證流程" align="center" />
+        <Text role="subtitle" content="一張能被伺服器驗證的數位通行證" align="center" />
+      </Stack>
 
-  return (
-    <Scene
-      durationInFrames={durationInFrames}
-      background={{ variant: "grid", glow: "success" }}
-      caption="登入成功後，伺服器簽發 JWT；之後每次請求都帶著它證明身分。"
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100%",
-          gap: tokens.spacing.lg,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            opacity: titleIn,
-            transform: `translateY(${interpolate(titleIn, [0, 1], [24, 0], clampExtrapolate)}px)`,
-          }}
-        >
-          <Callout variant="pill" tone="success" text="AUTHENTICATION, EXPLAINED" />
-          <div
-            style={{
-              color: tokens.color.text,
-              fontFamily: tokens.fontFamily.sans,
-              fontSize: tokens.fontSize.xl,
-              lineHeight: 1,
-              fontWeight: 820,
-              letterSpacing: -5,
-              marginTop: 28,
-            }}
-          >
-            JWT 驗證流程
-          </div>
-          <div
-            style={{
-              color: tokens.color.textMuted,
-              fontFamily: tokens.fontFamily.sans,
-              fontSize: 28,
-              marginTop: 20,
-              letterSpacing: 1,
-            }}
-          >
-            一張能被伺服器驗證的數位通行證
-          </div>
-        </div>
+      <Diagram
+        graph={GRAPH}
+        width="wide"
+        fit="width"
+        activeNodes={[{ node: "authServer", window: { from: 0.6, to: 1 } }]}
+        reveal={{ window: { from: 0.23, to: 0.4 } }}
+        flows={[
+          {
+            edge: "client->authServer",
+            window: { from: 0.35, to: 0.58 },
+            tone: "success",
+            label: "LOGIN",
+          },
+        ]}
+      />
 
-        <div style={{ width: 760, height: 260 }}>
-          <Diagram
-            graph={GRAPH}
-            activeNodes={frame > 108 ? ["authServer"] : []}
-            reveal={{ window: { from: 0.23, to: 0.4 } }}
-            flows={[
-              {
-                edge: "client->authServer",
-                window: { from: 0.35, to: 0.58 },
-                tone: "success",
-                label: "LOGIN",
-              },
-            ]}
-          />
-        </div>
-
-        <div style={{ width: 460 }}>
-          <CodeBlock
-            size="sm"
-            reveal={{ window: { from: 0.6, to: 0.75 } }}
-            lines={[{ segments: [{ text: "eyJhbGci...eyJzdWI...SflKxw", tone: "success" }] }]}
-          />
-        </div>
-      </div>
-    </Scene>
-  );
-};
+      <Stack width="half">
+        <CodeBlock
+          size="sm"
+          reveal={{ window: { from: 0.6, to: 0.75 } }}
+          lines={[{ segments: [{ text: "eyJhbGci...eyJzdWI...SflKxw", tone: "success" }] }]}
+        />
+      </Stack>
+    </Stack>
+  </Scene>
+);

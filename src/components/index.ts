@@ -5,6 +5,7 @@ export * from "./tokens";
 
 export { Icon } from "./icons/Icon";
 export type { IconProps } from "./icons/Icon";
+export { ICON_NAMES } from "./icons/registry";
 export type { IconName } from "./icons/registry";
 
 export { Scene } from "./Scene/Scene";
@@ -16,6 +17,18 @@ export type { CalloutProps } from "./Callout/Callout";
 
 export { StepReveal, useSteps } from "./StepReveal/StepReveal";
 export type { ResolvedStep, Step, StepRevealProps } from "./StepReveal/StepReveal";
+
+export { StepSwitch } from "./StepReveal/StepSwitch";
+export type { StepSwitchCase, StepSwitchProps } from "./StepReveal/StepSwitch";
+
+export { Stack } from "./Stack/Stack";
+export type { StackProps } from "./Stack/Stack";
+
+export { Text } from "./Text/Text";
+export type { TextProps, TextRole, TextRun } from "./Text/Text";
+
+export { Meter } from "./Meter/Meter";
+export type { MeterProps } from "./Meter/Meter";
 
 export { computeLayout } from "./layout/computeLayout";
 export { buildRoundedPath } from "./layout/edgePath";
@@ -29,7 +42,7 @@ export type {
 } from "./layout/types";
 
 export { Diagram } from "./Diagram/Diagram";
-export type { DiagramProps } from "./Diagram/Diagram";
+export type { DiagramActiveNode, DiagramProps } from "./Diagram/Diagram";
 export { useDiagramLayout } from "./Diagram/DiagramContext";
 
 export { FlowPulse } from "./FlowPulse/FlowPulse";
@@ -54,6 +67,7 @@ export {
   resolveSteps,
   resolveWindow,
   stepStateAtFrame,
+  stepWindows,
 } from "./motion/timing";
 export type {
   FrameRange,
@@ -62,3 +76,4 @@ export type {
   StepState,
   WeightedStep,
 } from "./motion/timing";
+export { useRevealStyle } from "./motion/useRevealStyle";

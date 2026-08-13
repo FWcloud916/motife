@@ -1,6 +1,6 @@
 import type { FC, ReactNode } from "react";
 import { useContext, useEffect, useMemo, useState } from "react";
-import { cancelRender, continueRender, delayRender } from "remotion";
+import { cancelRender, continueRender, delayRender, useCurrentFrame } from "remotion";
 import { CameraRegistryContext, DIAGRAM_BOUNDS_ID } from "../Camera/CameraRegistryContext";
 import { FlowPulse } from "../FlowPulse/FlowPulse";
 import type { FlowSpec } from "../FlowPulse/FlowPulse";
@@ -12,10 +12,18 @@ import { stagger } from "../motion/progress";
 import { resolveWindow } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
 import { fontsReady } from "../tokens";
-import type { Window } from "../tokens";
-import { tokens } from "../tokens";
+import type { Measure, Window } from "../tokens";
+import { MEASURE_WIDTH, tokens } from "../tokens";
 import { DiagramContext } from "./DiagramContext";
 import { DiagramNode } from "./DiagramNode";
+
+/** A node id that's active from the start, or one that only becomes active
+ * once `window` begins — and then stays active, mirroring how Phase 1's
+ * scenes used it (Intro's `frame > 108 ? [...] : []`, Walkthrough's
+ * `activeIndex > 0 ? [...] : []`): a one-way threshold, not a pulse that
+ * turns back off. `window.to` is therefore ignored; only `window.from`
+ * matters. */
+export type DiagramActiveNode = string | { node: string; window: Window };
 
 export interface DiagramProps {
   graph: GraphSpec;
@@ -23,11 +31,18 @@ export interface DiagramProps {
    * box it's given, preserving proportions. "width" scales to the box's
    * width only, letting height follow the diagram's own aspect ratio. */
   fit?: "width" | "contain";
-  activeNodes?: string[];
+  activeNodes?: DiagramActiveNode[];
   reveal?: { order?: "rank" | "all"; window?: Window };
   /** Convenience: render these FlowPulses inside this Diagram's own
    * DiagramContext, instead of nesting <FlowPulse> as a child by hand. */
   flows?: FlowSpec[];
+  /** Semantic width, for a Diagram sitting beside a sibling inside a Stack
+   * row. Omit for a Diagram that should size to its own content (via
+   * `fit`). No effect when nested inside a <Camera> — see below. */
+  width?: Measure;
+  /** Take a proportional share of the remaining space in the enclosing
+   * Stack's main axis. No effect when nested inside a <Camera>. */
+  grow?: boolean;
   /** Overlay slot — e.g. <CameraTarget> registrations. */
   children?: ReactNode;
 }
@@ -62,6 +77,8 @@ export const Diagram: FC<DiagramProps> = ({
   activeNodes = [],
   reveal: revealSpec,
   flows = [],
+  width,
+  grow,
   children,
 }) => {
   // Node footprints measured from the real rendered text, so a long label
@@ -129,7 +146,15 @@ export const Diagram: FC<DiagramProps> = ({
     baseDelay,
   );
 
-  const activeSet = new Set(activeNodes);
+  const frame = useCurrentFrame();
+  const activeSet = new Set(
+    activeNodes
+      .filter((entry) => {
+        if (typeof entry === "string") return true;
+        return frame >= resolveWindow(entry.window, durationInFrames).startFrame;
+      })
+      .map((entry) => (typeof entry === "string" ? entry : entry.node)),
+  );
   const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
 
   const content = (
@@ -202,7 +227,7 @@ export const Diagram: FC<DiagramProps> = ({
   const svgSizeStyle =
     fit === "width" ? { aspectRatio: `${layout.width} / ${layout.height}` } : { height: "100%" };
 
-  return (
+  const svg = (
     <svg
       viewBox={`0 0 ${layout.width} ${layout.height}`}
       preserveAspectRatio="xMidYMid meet"
@@ -215,5 +240,16 @@ export const Diagram: FC<DiagramProps> = ({
         </div>
       </foreignObject>
     </svg>
+  );
+
+  // Only wrap in a sizing div when a Stack actually asked for one — an
+  // unconditional wrapper would add an extra `height: 100%`-less box that
+  // silently breaks `fit="contain"` callers who rely on their own
+  // ancestor's fixed height reaching the svg directly.
+  if (!width && !grow) return svg;
+  return (
+    <div style={{ width: width ? MEASURE_WIDTH[width] : undefined, flex: grow ? "1 1 0" : undefined }}>
+      {svg}
+    </div>
   );
 };

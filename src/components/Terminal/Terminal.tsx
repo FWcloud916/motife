@@ -2,8 +2,8 @@ import type { FC } from "react";
 import { useCurrentFrame } from "remotion";
 import { resolveWindow } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
-import type { Size, Tone, Window } from "../tokens";
-import { tokens } from "../tokens";
+import type { Measure, Size, Tone, Window } from "../tokens";
+import { MEASURE_WIDTH, tokens } from "../tokens";
 
 export interface TerminalStep {
   command: string;
@@ -16,6 +16,12 @@ export interface TerminalProps {
   title?: string;
   steps: TerminalStep[];
   size?: Size;
+  /** Semantic width, for a Terminal sitting beside a sibling inside a
+   * Stack row. Omit for a Terminal that should size to its own content. */
+  width?: Measure;
+  /** Take a proportional share of the remaining space in the enclosing
+   * Stack's main axis, instead of sizing to content. */
+  grow?: boolean;
 }
 
 const FONT_SIZE: Record<Size, number> = {
@@ -26,7 +32,13 @@ const FONT_SIZE: Record<Size, number> = {
 
 const DOT_COLORS = [tokens.color.danger, tokens.color.warning, tokens.color.mint];
 
-export const Terminal: FC<TerminalProps> = ({ title = "Terminal", steps, size = "md" }) => {
+export const Terminal: FC<TerminalProps> = ({
+  title = "Terminal",
+  steps,
+  size = "md",
+  width,
+  grow,
+}) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useSceneTiming();
 
@@ -38,6 +50,9 @@ export const Terminal: FC<TerminalProps> = ({ title = "Terminal", steps, size = 
         borderRadius: tokens.radius.md,
         boxShadow: "0 25px 70px #0007",
         overflow: "hidden",
+        width: width ? MEASURE_WIDTH[width] : undefined,
+        flex: grow ? "1 1 0" : undefined,
+        boxSizing: "border-box",
       }}
     >
       <div

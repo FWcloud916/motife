@@ -3,8 +3,8 @@ import { interpolate, useCurrentFrame } from "remotion";
 import { clampExtrapolate, reveal } from "../motion/progress";
 import { resolveWindow } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
-import type { Size, Tone, Window } from "../tokens";
-import { tokens } from "../tokens";
+import type { Measure, Size, Tone, Window } from "../tokens";
+import { MEASURE_WIDTH, tokens } from "../tokens";
 
 // Own micro-model instead of a real syntax highlighter (shiki/prism): no
 // bundle weight, no async setup, and the segments are exactly the shape a
@@ -30,6 +30,18 @@ export interface CodeBlockProps {
   reveal?: { mode?: "all" | "staggered"; window?: Window };
   highlights?: CodeHighlight[];
   size?: Size;
+  /** "panel" (default): the card chrome — gradient background, border,
+   * shadow, padding. "bare": none of that, so a CodeBlock can sit inside a
+   * Callout card (or any other panel) without doubling up the chrome —
+   * replaces Breakdown's `<pre>` and Walkthrough's inline mono formula,
+   * which used to hand-roll bare monospace text for exactly this reason. */
+  chrome?: "panel" | "bare";
+  /** Semantic width, for a CodeBlock sitting beside a sibling inside a
+   * Stack row. Omit for a CodeBlock that should size to its own content. */
+  width?: Measure;
+  /** Take a proportional share of the remaining space in the enclosing
+   * Stack's main axis, instead of sizing to content. */
+  grow?: boolean;
 }
 
 const FONT_SIZE: Record<Size, number> = {
@@ -47,6 +59,9 @@ export const CodeBlock: FC<CodeBlockProps> = ({
   reveal: revealSpec,
   highlights = [],
   size = "md",
+  chrome = "panel",
+  width,
+  grow,
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useSceneTiming();
@@ -62,13 +77,19 @@ export const CodeBlock: FC<CodeBlockProps> = ({
   return (
     <div
       style={{
-        background: `linear-gradient(145deg, ${tokens.color.surfaceRaised}f2, ${tokens.color.surface}f2)`,
-        border: `1px solid ${tokens.color.line}88`,
-        borderRadius: tokens.radius.md,
-        boxShadow: "0 25px 70px #0007",
-        padding: tokens.spacing.md,
+        background:
+          chrome === "panel"
+            ? `linear-gradient(145deg, ${tokens.color.surfaceRaised}f2, ${tokens.color.surface}f2)`
+            : undefined,
+        border: chrome === "panel" ? `1px solid ${tokens.color.line}88` : undefined,
+        borderRadius: chrome === "panel" ? tokens.radius.md : undefined,
+        boxShadow: chrome === "panel" ? "0 25px 70px #0007" : undefined,
+        padding: chrome === "panel" ? tokens.spacing.md : undefined,
         fontFamily: tokens.fontFamily.mono,
         fontSize: FONT_SIZE[size],
+        width: width ? MEASURE_WIDTH[width] : undefined,
+        flex: grow ? "1 1 0" : undefined,
+        boxSizing: "border-box",
       }}
     >
       {title ? (

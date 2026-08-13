@@ -1,12 +1,9 @@
 import type { FC, ReactNode } from "react";
-import { interpolate, useCurrentFrame } from "remotion";
-import { useSceneTiming } from "../Scene/SceneContext";
 import { Icon } from "../icons/Icon";
 import type { IconName } from "../icons/registry";
-import { clampExtrapolate, reveal } from "../motion/progress";
-import { resolveWindow } from "../motion/timing";
-import type { Emphasis, Size, Tone, Window } from "../tokens";
-import { tokens } from "../tokens";
+import { useRevealStyle } from "../motion/useRevealStyle";
+import type { Emphasis, Measure, Size, Tone, Window } from "../tokens";
+import { MEASURE_WIDTH, tokens } from "../tokens";
 
 interface CalloutBase {
   tone?: Tone;
@@ -17,7 +14,20 @@ interface CalloutBase {
 
 export type CalloutProps =
   | (CalloutBase & { variant: "pill"; text: string; icon?: IconName })
-  | (CalloutBase & { variant: "card"; emphasis?: Emphasis; size?: Size; children: ReactNode })
+  | (CalloutBase & {
+      variant: "card";
+      emphasis?: Emphasis;
+      size?: Size;
+      /** Semantic width, for a card sitting beside a sibling inside a Stack
+       * row (e.g. Walkthrough's fixed-ish checklist column). Omit for a
+       * card that should size to its own content. */
+      width?: Measure;
+      /** Take a proportional share of the remaining space in the enclosing
+       * Stack's main axis, instead of sizing to content — the semantic
+       * replacement for the Phase 1 scenes' `flex: 1`. */
+      grow?: boolean;
+      children: ReactNode;
+    })
   | (CalloutBase & { variant: "banner"; text: string; detail?: string; icon?: IconName });
 
 const SIZE_PADDING: Record<Size, number> = {
@@ -30,17 +40,6 @@ function shadowFor(emphasis: Emphasis, accent: string): string {
   if (emphasis === "high") return `0 0 0 1px ${accent}55, 0 25px 80px ${accent}22`;
   if (emphasis === "medium") return "0 25px 70px #0007";
   return "0 20px 60px #0006";
-}
-
-function useRevealStyle(window: Window | undefined): { opacity: number; transform: string } {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useSceneTiming();
-  const delay = window ? resolveWindow(window, durationInFrames).startFrame : 0;
-  const progress = reveal(frame, delay);
-  return {
-    opacity: progress,
-    transform: `translateY(${interpolate(progress, [0, 1], [14, 0], clampExtrapolate)}px)`,
-  };
 }
 
 // Absorbs Phase 0's Pill/Card/status-banner primitives into one
@@ -134,9 +133,20 @@ export const Callout: FC<CalloutProps> = (props) => {
         padding: SIZE_PADDING[size],
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
+        // "stretch" (not the Phase 1 "center") so a Stack placed directly
+        // inside a card decides its own children's cross-axis alignment —
+        // "center" fought every scene into re-declaring `alignSelf:
+        // flex-start`/`stretch` on nearly every interior element.
+        alignItems: "stretch",
         justifyContent: "center",
         gap: tokens.spacing.sm,
+        width: props.width ? MEASURE_WIDTH[props.width] : undefined,
+        // Main-axis grow only — NOT also a forced height:100%. A card is
+        // always a Stack's flex child, never handed directly to a
+        // non-flex parent the way a root Stack can be, so it doesn't need
+        // Stack's "also fill height" fallback; cross-axis sizing is the
+        // enclosing Stack's `align` to decide (stretch vs. content-sized).
+        flex: props.grow ? "1 1 0" : undefined,
       }}
     >
       {props.children}
