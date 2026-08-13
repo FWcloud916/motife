@@ -5,9 +5,23 @@ import { parseDocumentOrThrow } from "../compiler";
 import { dslTotalFrames } from "../compiler/timeline";
 import { DslVideo } from "../compiler/render";
 import type { DslVideoProps } from "../compiler/render";
+import { RAW_DOCS } from "../dsl/docs/manifest";
 import { ComponentGallery, GALLERY_TOTAL_FRAMES } from "./compositions/gallery/ComponentGallery";
 import { JwtAuthFlow } from "./compositions/jwt-auth/JwtAuthFlow";
 import { FPS, WIDTH, HEIGHT, TOTAL_FRAMES } from "./compositions/jwt-auth/storyboard";
+
+// Stage 4: JwtAuthFlowDsl, the DSL port of the same baseline JwtAuthFlow
+// renders below — registered side by side under a temporary id for A/B
+// comparison. Parsed at module scope, like BLANK_DOC below: a malformed
+// baseline fails the bundle loudly rather than rendering garbage.
+//
+// Deliberately a LITERAL durationInFrames per doc (via dslTimeline, not
+// calculateMetadata): scripts/smoke.mjs's correctness must not depend on
+// whether getCompositions() evaluates calculateMetadata in this Remotion
+// version — DslPreview above is the one composition that needs dynamic
+// sizing (an ad-hoc doc has no baseline to pin), every registered baseline
+// here does not.
+const DSL_DOCS = RAW_DOCS.map((raw) => parseDocumentOrThrow(raw));
 
 // A tiny, permanently-valid document — the default DslPreview shows on
 // first Studio load, and what scripts/render-dsl.mjs's --props override
@@ -100,6 +114,18 @@ export const RemotionRoot: React.FC = () => (
       height={HEIGHT}
       defaultProps={{}}
     />
+    {DSL_DOCS.map((doc) => (
+      <Composition
+        key={doc.id}
+        id={doc.id}
+        component={DslVideo}
+        durationInFrames={dslTotalFrames(doc)}
+        fps={doc.fps}
+        width={doc.width}
+        height={doc.height}
+        defaultProps={{ doc }}
+      />
+    ))}
     {/* The zero-TypeScript render path (motife-plan.md §3 Phase 2
         acceptance): `pnpm render:dsl <doc>.json out.mp4` renders ANY valid
         DSL document through this one composition — nothing here is

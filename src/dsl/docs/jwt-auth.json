@@ -1,0 +1,605 @@
+{
+  "version": 1,
+  "id": "JwtAuthFlowDsl",
+  "title": "JWT 驗證流程",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "intro",
+      "beat": "intro",
+      "durationInSeconds": 6,
+      "narration": "每次登入之後，JWT 讓客戶端帶著一張可驗證的數位通行證，向 API 證明自己的身分。",
+      "caption": "登入成功後，伺服器簽發 JWT；之後每次請求都帶著它證明身分。",
+      "background": { "variant": "grid", "glow": "success" },
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "align": "center",
+        "justify": "center",
+        "gap": "lg",
+        "children": [
+          {
+            "type": "stack",
+            "align": "center",
+            "gap": "sm",
+            "children": [
+              { "type": "pill", "tone": "success", "text": "AUTHENTICATION, EXPLAINED" },
+              { "type": "text", "role": "hero", "content": "JWT 驗證流程", "align": "center" },
+              { "type": "text", "role": "subtitle", "content": "一張能被伺服器驗證的數位通行證", "align": "center" }
+            ]
+          },
+          {
+            "type": "diagram",
+            "width": "wide",
+            "fit": "width",
+            "graph": {
+              "direction": "right",
+              "nodes": [
+                { "id": "client", "icon": "browser", "label": "Client", "detail": "已登入的使用者", "tone": "info" },
+                { "id": "authServer", "icon": "server", "label": "Auth Server", "detail": "簽發 JWT", "tone": "success" }
+              ],
+              "edges": [{ "from": "client", "to": "authServer", "label": "LOGIN" }]
+            },
+            "activeNodes": [{ "node": "authServer", "window": { "from": 0.6, "to": 1 } }],
+            "reveal": { "window": { "from": 0.23, "to": 0.4 } },
+            "flows": [
+              {
+                "edge": "client->authServer",
+                "window": { "from": 0.35, "to": 0.58 },
+                "tone": "success",
+                "label": "LOGIN"
+              }
+            ]
+          },
+          {
+            "type": "stack",
+            "width": "half",
+            "children": [
+              {
+                "type": "code",
+                "size": "sm",
+                "reveal": { "window": { "from": 0.6, "to": 0.75 } },
+                "lines": [{ "segments": [{ "text": "eyJhbGci...eyJzdWI...SflKxw", "tone": "success" }] }]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "breakdown",
+      "beat": "breakdown",
+      "durationInSeconds": 10,
+      "narration": "一個 JWT 由 Header、Payload、Signature 三段組成。前兩段只是 Base64URL 編碼，任何人都能讀；真正防止竄改的是簽章。",
+      "caption": "Header 和 Payload 任何人都能解碼；Signature 才是防竄改的關鍵。",
+      "background": { "variant": "grid", "glow": "syntaxB" },
+      "header": { "eyebrow": "01 · Anatomy", "title": "JWT 裡面有什麼？" },
+      "content": {
+        "type": "stack",
+        "align": "center",
+        "gap": "lg",
+        "children": [
+          {
+            "type": "stack",
+            "width": "wide",
+            "children": [
+              {
+                "type": "code",
+                "size": "sm",
+                "reveal": { "window": { "from": 0.08, "to": 0.2 } },
+                "lines": [
+                  {
+                    "segments": [
+                      { "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "tone": "syntaxA" },
+                      ".",
+                      { "text": "eyJzdWIiOiJ1c2VyXzQyIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2NTA3MjAwfQ", "tone": "syntaxB" },
+                      ".",
+                      { "text": "SflKxwRJSMeKKF2QT4fwpMeJf36", "tone": "syntaxC" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "stack",
+            "direction": "row",
+            "gap": "lg",
+            "width": "full",
+            "children": [
+              {
+                "type": "card",
+                "tone": "syntaxA",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.18, "to": 0.48 },
+                "children": [
+                  { "type": "text", "role": "label", "tone": "syntaxA", "content": "01 / HEADER" },
+                  {
+                    "type": "code",
+                    "chrome": "bare",
+                    "size": "sm",
+                    "lines": [
+                      { "segments": ["{"] },
+                      { "segments": ["\"alg\": \"HS256\","], "indent": 1 },
+                      { "segments": ["\"typ\": \"JWT\""], "indent": 1 },
+                      { "segments": ["}"] }
+                    ]
+                  },
+                  { "type": "text", "role": "detail", "content": "演算法與 token 類型" }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "syntaxB",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.28, "to": 0.58 },
+                "children": [
+                  { "type": "text", "role": "label", "tone": "syntaxB", "content": "02 / PAYLOAD" },
+                  {
+                    "type": "code",
+                    "chrome": "bare",
+                    "size": "sm",
+                    "lines": [
+                      { "segments": ["{"] },
+                      { "segments": ["\"sub\": \"user_42\","], "indent": 1 },
+                      { "segments": ["\"role\": \"admin\","], "indent": 1 },
+                      { "segments": ["\"exp\": 1786507200"], "indent": 1 },
+                      { "segments": ["}"] }
+                    ]
+                  },
+                  { "type": "text", "role": "detail", "content": "Claims：身分與權限資料" }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "syntaxC",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.38, "to": 0.68 },
+                "children": [
+                  { "type": "text", "role": "label", "tone": "syntaxC", "content": "03 / SIGNATURE" },
+                  {
+                    "type": "code",
+                    "chrome": "bare",
+                    "size": "sm",
+                    "lines": [
+                      { "segments": ["HMACSHA256("] },
+                      { "segments": ["base64url(header) + '.' +"], "indent": 1 },
+                      { "segments": ["base64url(payload), secret"], "indent": 1 },
+                      { "segments": [")"] }
+                    ]
+                  },
+                  { "type": "text", "role": "detail", "content": "證明內容未被竄改" }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "pill",
+            "tone": "warning",
+            "text": "⚠ Payload 是編碼，不是加密",
+            "window": { "from": 0.58, "to": 0.65 }
+          }
+        ]
+      }
+    },
+    {
+      "id": "walkthrough",
+      "beat": "walkthrough",
+      "durationInSeconds": 18,
+      "narration": "API 收到 Bearer token 後，先重新計算並比對簽章，再檢查有效期限、簽發者和受眾。全部通過，請求才會被授權。",
+      "caption": "JWT 不是「解開就相信」：簽章與 claims 必須全部通過，請求才能被授權。",
+      "background": { "variant": "grid", "glow": "info" },
+      "header": { "eyebrow": "02 · Verification", "title": "API 如何驗證 JWT？" },
+      "tracks": [
+        {
+          "id": "checks",
+          "window": { "from": 0.05, "to": 0.98 },
+          "items": [
+            { "title": "Extract token", "detail": "讀取 Authorization header", "weight": 1 },
+            { "title": "Verify signature", "detail": "用可信任的 key 驗章", "weight": 1 },
+            { "title": "Validate claims", "detail": "檢查 exp · iss · aud", "weight": 1 },
+            { "title": "Authorize", "detail": "套用角色與權限", "weight": 0.6 }
+          ]
+        },
+        {
+          "id": "claims",
+          "window": { "track": "checks", "step": 2 },
+          "items": [
+            { "title": "exp", "detail": "尚未過期" },
+            { "title": "iss", "detail": "簽發者正確" },
+            { "title": "aud", "detail": "受眾符合" }
+          ]
+        }
+      ],
+      "content": {
+        "type": "stack",
+        "direction": "row",
+        "grow": true,
+        "gap": "lg",
+        "align": "stretch",
+        "children": [
+          {
+            "type": "card",
+            "emphasis": "medium",
+            "size": "lg",
+            "width": "narrow",
+            "children": [{ "type": "steps", "track": "checks", "label": "SERVER CHECKLIST" }]
+          },
+          {
+            "type": "switch",
+            "track": "checks",
+            "cases": [
+              {
+                "steps": [0, 2],
+                "content": {
+                  "type": "card",
+                  "tone": "info",
+                  "emphasis": "medium",
+                  "size": "lg",
+                  "grow": true,
+                  "children": [
+                    {
+                      "type": "stack",
+                      "direction": "row",
+                      "justify": "between",
+                      "align": "center",
+                      "children": [
+                        { "type": "text", "role": "label", "content": "GET /api/profile" },
+                        { "type": "pill", "tone": "info", "text": "VERIFYING" }
+                      ]
+                    },
+                    {
+                      "type": "diagram",
+                      "graph": {
+                        "direction": "right",
+                        "nodes": [
+                          { "id": "client", "icon": "browser", "label": "Client", "tone": "syntaxB" },
+                          { "id": "apiServer", "icon": "server", "label": "API Server", "tone": "info" }
+                        ],
+                        "edges": [{ "from": "client", "to": "apiServer" }]
+                      },
+                      "activeNodes": [{ "node": "apiServer", "window": { "track": "checks", "step": 1 } }],
+                      "reveal": { "window": { "from": 0, "to": 0.05 } },
+                      "flows": [
+                        {
+                          "edge": "client->apiServer",
+                          "window": { "track": "checks", "step": 0 },
+                          "tone": "syntaxB",
+                          "label": "Authorization: Bearer JWT"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "switch",
+                      "track": "checks",
+                      "cases": [
+                        {
+                          "steps": [0, 0],
+                          "content": {
+                            "type": "code",
+                            "chrome": "bare",
+                            "size": "sm",
+                            "lines": [
+                              {
+                                "segments": [
+                                  { "text": "Authorization: ", "tone": "syntaxB" },
+                                  "Bearer eyJhbGci...SflKxw"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "steps": [1, 1],
+                          "content": {
+                            "type": "stack",
+                            "gap": "md",
+                            "children": [
+                              {
+                                "type": "stack",
+                                "direction": "row",
+                                "align": "center",
+                                "gap": "md",
+                                "children": [
+                                  { "type": "icon", "name": "key", "tone": "syntaxC", "size": "lg" },
+                                  {
+                                    "type": "stack",
+                                    "gap": "sm",
+                                    "children": [
+                                      { "type": "text", "role": "label", "tone": "syntaxC", "content": "RECOMPUTE SIGNATURE" },
+                                      {
+                                        "type": "code",
+                                        "chrome": "bare",
+                                        "size": "sm",
+                                        "lines": [
+                                          {
+                                            "segments": [
+                                              "HMACSHA256(base64url(header)+'.'+base64url(payload), secret) === signature"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              { "type": "meter", "tone": "syntaxC", "window": { "track": "checks", "step": 1 } }
+                            ]
+                          }
+                        },
+                        {
+                          "steps": [2, 2],
+                          "content": { "type": "steps", "track": "claims", "layout": "row" }
+                        },
+                        {
+                          "steps": [3, 3],
+                          "content": {
+                            "type": "stack",
+                            "grow": true,
+                            "align": "center",
+                            "justify": "center",
+                            "children": [
+                              {
+                                "type": "banner",
+                                "tone": "success",
+                                "icon": "shield",
+                                "text": "Access granted",
+                                "detail": "role: admin · scope: profile:read",
+                                "window": { "track": "checks", "step": 3 }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "steps": [3, 3],
+                "content": {
+                  "type": "card",
+                  "tone": "success",
+                  "emphasis": "medium",
+                  "size": "lg",
+                  "grow": true,
+                  "children": [
+                    {
+                      "type": "stack",
+                      "direction": "row",
+                      "justify": "between",
+                      "align": "center",
+                      "children": [
+                        { "type": "text", "role": "label", "content": "GET /api/profile" },
+                        { "type": "pill", "tone": "success", "text": "200 AUTHORIZED" }
+                      ]
+                    },
+                    {
+                      "type": "diagram",
+                      "graph": {
+                        "direction": "right",
+                        "nodes": [
+                          { "id": "client", "icon": "browser", "label": "Client", "tone": "syntaxB" },
+                          { "id": "apiServer", "icon": "server", "label": "API Server", "tone": "info" }
+                        ],
+                        "edges": [{ "from": "client", "to": "apiServer" }]
+                      },
+                      "activeNodes": [{ "node": "apiServer", "window": { "track": "checks", "step": 1 } }],
+                      "reveal": { "window": { "from": 0, "to": 0.05 } },
+                      "flows": [
+                        {
+                          "edge": "client->apiServer",
+                          "window": { "track": "checks", "step": 0 },
+                          "tone": "syntaxB",
+                          "label": "Authorization: Bearer JWT"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "switch",
+                      "track": "checks",
+                      "cases": [
+                        {
+                          "steps": [0, 0],
+                          "content": {
+                            "type": "code",
+                            "chrome": "bare",
+                            "size": "sm",
+                            "lines": [
+                              {
+                                "segments": [
+                                  { "text": "Authorization: ", "tone": "syntaxB" },
+                                  "Bearer eyJhbGci...SflKxw"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "steps": [1, 1],
+                          "content": {
+                            "type": "stack",
+                            "gap": "md",
+                            "children": [
+                              {
+                                "type": "stack",
+                                "direction": "row",
+                                "align": "center",
+                                "gap": "md",
+                                "children": [
+                                  { "type": "icon", "name": "key", "tone": "syntaxC", "size": "lg" },
+                                  {
+                                    "type": "stack",
+                                    "gap": "sm",
+                                    "children": [
+                                      { "type": "text", "role": "label", "tone": "syntaxC", "content": "RECOMPUTE SIGNATURE" },
+                                      {
+                                        "type": "code",
+                                        "chrome": "bare",
+                                        "size": "sm",
+                                        "lines": [
+                                          {
+                                            "segments": [
+                                              "HMACSHA256(base64url(header)+'.'+base64url(payload), secret) === signature"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              { "type": "meter", "tone": "syntaxC", "window": { "track": "checks", "step": 1 } }
+                            ]
+                          }
+                        },
+                        {
+                          "steps": [2, 2],
+                          "content": { "type": "steps", "track": "claims", "layout": "row" }
+                        },
+                        {
+                          "steps": [3, 3],
+                          "content": {
+                            "type": "stack",
+                            "grow": true,
+                            "align": "center",
+                            "justify": "center",
+                            "children": [
+                              {
+                                "type": "banner",
+                                "tone": "success",
+                                "icon": "shield",
+                                "text": "Access granted",
+                                "detail": "role: admin · scope: profile:read",
+                                "window": { "track": "checks", "step": 3 }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "summary",
+      "beat": "summary",
+      "durationInSeconds": 6,
+      "narration": "記住三件事：永遠驗證簽章、完整檢查 claims，而且不要把敏感資料放進 payload。JWT 證明完整性，不負責保密。",
+      "caption": null,
+      "background": { "variant": "grid", "glow": "success" },
+      "header": { "eyebrow": "THE TAKEAWAY", "title": "驗證完整性，不是隱藏內容", "tone": "success", "scale": "hero" },
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "justify": "center",
+        "gap": "xl",
+        "children": [
+          {
+            "type": "stack",
+            "direction": "row",
+            "align": "center",
+            "gap": "lg",
+            "children": [
+              {
+                "type": "card",
+                "tone": "success",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.13, "to": 0.38 },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      { "type": "text", "role": "label", "tone": "success", "content": "01" },
+                      { "type": "icon", "name": "key", "tone": "success" }
+                    ]
+                  },
+                  { "type": "text", "role": "body", "content": "Verify signature" },
+                  { "type": "text", "role": "detail", "content": "只信任你允許的演算法與 key" }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "success",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.21, "to": 0.46 },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      { "type": "text", "role": "label", "tone": "success", "content": "02" },
+                      { "type": "icon", "name": "shield", "tone": "success" }
+                    ]
+                  },
+                  { "type": "text", "role": "body", "content": "Validate claims" },
+                  { "type": "text", "role": "detail", "content": "檢查 exp、iss、aud 與權限" }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "warning",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.29, "to": 0.54 },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      { "type": "text", "role": "label", "tone": "warning", "content": "03" },
+                      { "type": "icon", "name": "user", "tone": "warning" }
+                    ]
+                  },
+                  { "type": "text", "role": "body", "content": "Payload is public" },
+                  { "type": "text", "role": "detail", "content": "不要放密碼或任何敏感資料" }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "stack",
+            "direction": "row",
+            "align": "center",
+            "justify": "center",
+            "gap": "md",
+            "window": { "from": 0.6, "to": 1 },
+            "children": [
+              { "type": "icon", "name": "shield", "tone": "info", "size": "sm" },
+              {
+                "type": "text",
+                "role": "detail",
+                "content": [{ "text": "Sign · Verify · Authorize", "strong": true }, " — 這就是 JWT 的信任鏈"]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
