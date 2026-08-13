@@ -14,6 +14,8 @@ const FRAME_PINS: Record<string, { total: number; from: number[] }> = {
   JwtAuthFlowDsl: { total: 1200, from: [0, 180, 480, 1020] },
   // 7 + 11 + 16 + 6 = 40s @ 30fps, all cuts.
   MqBackpressure: { total: 1200, from: [0, 210, 540, 1020] },
+  // 7 + 12 + 16 + 7 = 42s @ 30fps, all cuts.
+  DbIndexInternals: { total: 1260, from: [0, 210, 570, 1050] },
 };
 
 describe("RAW_DOCS", () => {

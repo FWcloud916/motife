@@ -1,0 +1,356 @@
+{
+  "version": 1,
+  "id": "DbIndexInternals",
+  "title": "DB Index 原理",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "intro",
+      "beat": "intro",
+      "durationInSeconds": 7,
+      "narration": "資料庫要找一列資料，可以整張表掃過去，也可以走一份排序好的索引，直接跳到目標位置。",
+      "caption": "索引就是一份排序好的副本，換一次更快的查詢。",
+      "background": { "variant": "grid", "glow": "primary" },
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "align": "center",
+        "justify": "center",
+        "gap": "lg",
+        "children": [
+          {
+            "type": "stack",
+            "align": "center",
+            "gap": "sm",
+            "children": [
+              { "type": "pill", "tone": "primary", "text": "DATABASE INDEXES, EXPLAINED" },
+              { "type": "text", "role": "hero", "content": "索引到底做了什麼", "align": "center" },
+              { "type": "text", "role": "subtitle", "content": "用一份排序好的副本，換一次更快的查詢", "align": "center" }
+            ]
+          },
+          {
+            "type": "diagram",
+            "width": "wide",
+            "fit": "width",
+            "graph": {
+              "direction": "right",
+              "nodes": [
+                { "id": "query", "icon": "document", "label": "Query", "tone": "info" },
+                { "id": "index", "icon": "document", "label": "Index", "tone": "primary" },
+                { "id": "row", "icon": "database", "label": "Row", "tone": "success" }
+              ],
+              "edges": [
+                { "from": "query", "to": "index", "label": "lookup" },
+                { "from": "index", "to": "row", "label": "fetch" }
+              ]
+            },
+            "reveal": { "order": "rank", "window": { "from": 0.2, "to": 0.4 } },
+            "activeNodes": [
+              "query",
+              { "node": "index", "window": { "from": 0.45, "to": 1 } },
+              { "node": "row", "window": { "from": 0.7, "to": 1 } }
+            ],
+            "flows": [
+              { "edge": "query->index", "window": { "from": 0.45, "to": 0.65 }, "tone": "primary" },
+              { "edge": "index->row", "window": { "from": 0.68, "to": 0.85 }, "tone": "success" }
+            ]
+          },
+          {
+            "type": "pill",
+            "tone": "danger",
+            "text": "沒有索引 = 逐列全表掃描",
+            "window": { "from": 0.35, "to": 0.5 }
+          },
+          {
+            "type": "stack",
+            "width": "half",
+            "children": [
+              {
+                "type": "code",
+                "size": "sm",
+                "reveal": { "window": { "from": 0.55, "to": 0.7 } },
+                "lines": [
+                  {
+                    "segments": [
+                      { "text": "SELECT", "tone": "syntaxA" },
+                      " * ",
+                      { "text": "FROM", "tone": "syntaxA" },
+                      " users ",
+                      { "text": "WHERE", "tone": "syntaxA" },
+                      " email = ?"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "breakdown",
+      "beat": "breakdown",
+      "durationInSeconds": 12,
+      "narration": "B+Tree 把資料由上而下分層排序：root 指向 internal node，internal node 指向 leaf，每個 leaf 之間還用指標串成一條鏈。",
+      "caption": "每個 leaf 都是排序好的資料副本，還用指標串成一條鏈。",
+      "background": { "variant": "grid", "glow": "info" },
+      "header": { "eyebrow": "01 · Structure", "title": "B+Tree 長什麼樣子？" },
+      "content": {
+        "type": "stack",
+        "direction": "row",
+        "grow": true,
+        "align": "stretch",
+        "justify": "center",
+        "gap": "xl",
+        "children": [
+          {
+            "type": "diagram",
+            "fit": "contain",
+            "grow": true,
+            "graph": {
+              "direction": "down",
+              "nodes": [
+                { "id": "root", "icon": "document", "label": "Root", "tone": "primary" },
+                { "id": "internal1", "icon": "document", "label": "Internal", "tone": "info", "detail": "key < 50" },
+                { "id": "internal2", "icon": "document", "label": "Internal", "tone": "info", "detail": "key >= 50" },
+                { "id": "leaf1", "icon": "document", "label": "Leaf", "tone": "success", "detail": "1–25" },
+                { "id": "leaf2", "icon": "document", "label": "Leaf", "tone": "success", "detail": "26–50" },
+                { "id": "leaf3", "icon": "document", "label": "Leaf", "tone": "success", "detail": "51–75" },
+                { "id": "leaf4", "icon": "document", "label": "Leaf", "tone": "success", "detail": "76–100" }
+              ],
+              "edges": [
+                { "from": "root", "to": "internal1" },
+                { "from": "root", "to": "internal2" },
+                { "from": "internal1", "to": "leaf1" },
+                { "from": "internal1", "to": "leaf2" },
+                { "from": "internal2", "to": "leaf3" },
+                { "from": "internal2", "to": "leaf4" }
+              ]
+            },
+            "reveal": { "order": "rank", "window": { "from": 0.05, "to": 0.35 } }
+          },
+          {
+            "type": "diagram",
+            "fit": "contain",
+            "grow": true,
+            "graph": {
+              "direction": "right",
+              "nodes": [
+                { "id": "chainLeaf1", "icon": "document", "label": "1–25", "tone": "success" },
+                { "id": "chainLeaf2", "icon": "document", "label": "26–50", "tone": "success" },
+                { "id": "chainLeaf3", "icon": "document", "label": "51–75", "tone": "success" },
+                { "id": "chainLeaf4", "icon": "document", "label": "76–100", "tone": "success" }
+              ],
+              "edges": [
+                { "from": "chainLeaf1", "to": "chainLeaf2", "label": "next" },
+                { "from": "chainLeaf2", "to": "chainLeaf3", "label": "next" },
+                { "from": "chainLeaf3", "to": "chainLeaf4", "label": "next" }
+              ]
+            },
+            "reveal": { "order": "rank", "window": { "from": 0.4, "to": 0.6 } },
+            "flows": [
+              { "edge": "chainLeaf1->chainLeaf2", "window": { "from": 0.6, "to": 0.72 }, "tone": "success" },
+              { "edge": "chainLeaf2->chainLeaf3", "window": { "from": 0.72, "to": 0.84 }, "tone": "success" },
+              { "edge": "chainLeaf3->chainLeaf4", "window": { "from": 0.84, "to": 0.96 }, "tone": "success" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "walkthrough",
+      "beat": "walkthrough",
+      "durationInSeconds": 16,
+      "narration": "查詢的時候，從 root 開始比較 key，決定往左或往右，一路下降到 internal node，最後命中 leaf，再用裡面的指標回到資料表本身。",
+      "caption": "從 root 一路比較到 leaf，最後用指標回到資料表本身。",
+      "background": { "variant": "grid", "glow": "primary" },
+      "header": { "eyebrow": "02 · Lookup", "title": "怎麼走到目標資料？" },
+      "tracks": [
+        {
+          "id": "lookup",
+          "window": { "from": 0.05, "to": 0.98 },
+          "items": [
+            { "title": "比較 root", "detail": "email 的 key 和 root 的分界比較" },
+            { "title": "下降 internal", "detail": "決定往哪個子樹前進" },
+            { "title": "命中 leaf", "detail": "找到排序好的資料列副本" },
+            { "title": "取 row 指標", "detail": "回到資料表本身，取完整的一列" }
+          ]
+        }
+      ],
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "gap": "md",
+        "children": [
+          {
+            "type": "card",
+            "emphasis": "low",
+            "size": "sm",
+            "children": [{ "type": "steps", "track": "lookup", "layout": "row", "label": "INDEX LOOKUP · 尋找 email = 'user@site.com'" }]
+          },
+          {
+            "type": "stack",
+            "grow": true,
+            "children": [
+              {
+                "type": "camera",
+                "shots": [
+                  { "window": { "from": 0, "to": 0.02 }, "focus": "all", "zoom": "wide" },
+                  { "window": { "track": "lookup", "step": 0 }, "focus": { "node": "root" }, "zoom": "medium" },
+                  { "window": { "track": "lookup", "step": 1 }, "focus": { "node": "internalA" }, "zoom": "close" },
+                  { "window": { "track": "lookup", "step": 2 }, "focus": { "node": "leafA" }, "zoom": "close" },
+                  { "window": { "track": "lookup", "step": 3 }, "focus": { "node": "table" }, "zoom": "close" }
+                ],
+                "children": [
+                  {
+                    "type": "diagram",
+                    "graph": {
+                      "direction": "down",
+                      "nodes": [
+                        { "id": "root", "icon": "document", "label": "Root", "tone": "primary" },
+                        { "id": "internalA", "icon": "document", "label": "Internal", "tone": "info" },
+                        { "id": "internalB", "icon": "document", "label": "Internal", "tone": "neutral" },
+                        { "id": "leafA", "icon": "document", "label": "Leaf", "tone": "success" },
+                        { "id": "leafB", "icon": "document", "label": "Leaf", "tone": "neutral" },
+                        { "id": "table", "icon": "database", "label": "Table Row", "tone": "success" }
+                      ],
+                      "edges": [
+                        { "from": "root", "to": "internalA" },
+                        { "from": "root", "to": "internalB" },
+                        { "from": "internalA", "to": "leafA" },
+                        { "from": "internalA", "to": "leafB" },
+                        { "from": "leafA", "to": "table" }
+                      ]
+                    },
+                    "activeNodes": [
+                      { "node": "root", "window": { "track": "lookup", "step": 0 } },
+                      { "node": "internalA", "window": { "track": "lookup", "step": 1 } },
+                      { "node": "leafA", "window": { "track": "lookup", "step": 2 } },
+                      { "node": "table", "window": { "track": "lookup", "step": 3 } }
+                    ],
+                    "flows": [
+                      { "edge": "root->internalA", "window": { "track": "lookup", "step": 1 }, "tone": "primary" },
+                      { "edge": "internalA->leafA", "window": { "track": "lookup", "step": 2 }, "tone": "success" },
+                      { "edge": "leafA->table", "window": { "track": "lookup", "step": 3 }, "tone": "success" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "summary",
+      "beat": "summary",
+      "durationInSeconds": 7,
+      "narration": "記住三件事：索引是排序好的副本、複合索引只有左前綴用得到、每次寫入都要多付一次維護成本。",
+      "caption": null,
+      "background": { "variant": "grid", "glow": "success" },
+      "header": { "eyebrow": "THE TAKEAWAY", "title": "索引是用空間換時間", "tone": "success", "scale": "hero" },
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "justify": "center",
+        "gap": "lg",
+        "children": [
+          {
+            "type": "stack",
+            "direction": "row",
+            "align": "center",
+            "gap": "lg",
+            "children": [
+              {
+                "type": "card",
+                "tone": "info",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.13, "to": 0.35 },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      { "type": "text", "role": "label", "tone": "info", "content": "01" },
+                      { "type": "icon", "name": "document", "tone": "info" }
+                    ]
+                  },
+                  { "type": "text", "role": "body", "content": "索引是排序好的副本" },
+                  { "type": "text", "role": "detail", "content": "多一份資料，換查詢速度" }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "warning",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.2, "to": 0.42 },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      { "type": "text", "role": "label", "tone": "warning", "content": "02" },
+                      { "type": "icon", "name": "key", "tone": "warning" }
+                    ]
+                  },
+                  { "type": "text", "role": "body", "content": "複合索引只吃左前綴" },
+                  { "type": "text", "role": "detail", "content": "查詢條件要從第一欄開始對齊" }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "danger",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": { "from": 0.27, "to": 0.49 },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      { "type": "text", "role": "label", "tone": "danger", "content": "03" },
+                      { "type": "icon", "name": "lock", "tone": "danger" }
+                    ]
+                  },
+                  { "type": "text", "role": "body", "content": "寫入要付維護成本" },
+                  { "type": "text", "role": "detail", "content": "每次寫入都要同步更新索引" }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "stack",
+            "width": "wide",
+            "window": { "from": 0.55, "to": 0.75 },
+            "children": [
+              {
+                "type": "terminal",
+                "size": "sm",
+                "steps": [
+                  {
+                    "command": "EXPLAIN ANALYZE SELECT * FROM users WHERE email = ?",
+                    "output": ["Index Scan using idx_email  (cost=0.42..8.44 rows=1)", "Planning Time: 0.082 ms"],
+                    "window": { "from": 0.55, "to": 1 }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

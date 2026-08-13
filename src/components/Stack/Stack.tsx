@@ -64,6 +64,27 @@ export const Stack: FC<StackProps> = ({
   children,
 }) => {
   const revealStyle = useRevealStyle(window);
+  // min-{height,width}: 0 on the MAIN axis is a deliberate flex-shrink
+  // enabler, not a blanket reset — it exists so a `grow` Stack correctly
+  // shrinks to (and gives its own children a definite height from) the
+  // share of space its flex parent actually allocates it, which is what
+  // Camera's `height: 100%` and Card's `align="stretch"` siblings depend
+  // on. Applying it unconditionally to a NON-grow, content-sized Stack is
+  // actively wrong: the browser's default `min-height: auto` on a flex
+  // item is what makes it refuse to shrink below its own content size —
+  // exactly the protection a content-sized Stack needs. Without it, a
+  // content-sized Stack sitting next to an oversized sibling (e.g. a tall
+  // multi-rank Diagram) in an overflowing flex column gets silently
+  // squeezed toward zero height by the flex algorithm while its text still
+  // paints at full size past that collapsed box — visually indistinguishable
+  // from the text overlapping its neighbour. Found via a real repro: an
+  // intro scene's hero/subtitle header Stack (no `grow`) measured 1.65px
+  // tall next to a 703px-tall diagram, though every pixel of text was still
+  // painted on screen. The cross axis keeps min:0 unconditionally — that's
+  // the standard fix for long unbreakable content overflowing sideways, and
+  // carries no such risk of erasing a sibling's box.
+  const mainAxisMinKey = direction === "row" ? "minWidth" : "minHeight";
+  const crossAxisMinKey = direction === "row" ? "minHeight" : "minWidth";
   return (
     <div
       style={{
@@ -76,8 +97,8 @@ export const Stack: FC<StackProps> = ({
         width: width ? MEASURE_WIDTH[width] : undefined,
         flex: grow ? "1 1 0" : undefined,
         height: grow ? "100%" : undefined,
-        minHeight: 0,
-        minWidth: 0,
+        [mainAxisMinKey]: grow ? 0 : undefined,
+        [crossAxisMinKey]: 0,
       }}
     >
       {children}
