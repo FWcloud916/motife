@@ -24,6 +24,11 @@ import { Scene, Diagram, Callout, tokens, /* ... */ } from "../../../components"
 Never reach into a component's own module path (`../../../components/Scene/Scene`)
 — the barrel is the contract; internal file layout can change freely.
 
+This is enforced, not just documented: `eslint.config.mjs` restricts the
+`**/components/**` import pattern across `src/remotion/**`, so a deep
+import fails `pnpm lint`. Files inside `src/components/**` are outside that
+rule and may import each other directly.
+
 ## Shared vocabulary (`tokens`)
 
 ```ts
@@ -151,6 +156,21 @@ interface DiagramProps {
 }
 ```
 
+**Node sizing:** a node's `Size` token is its *minimum* footprint, not a
+fixed one. `Diagram` measures each node's label and detail with
+`@remotion/layout-utils`' `measureText` (after `fontsReady()`, behind a
+`delayRender` handle) and widens the card to fit, clamped to
+`MAX_NODE_WIDTH` (560); past that the text wraps instead, and the card's
+padding plus `overflowWrap: "anywhere"` keep it inside the border. This
+matters most for CJK, where every glyph is full-width and a label
+overruns the 268px `md` token almost immediately.
+
+The measured sizes reach `computeLayout` as an optional `nodeSizes` record
+keyed by node id — **`GraphSpec` itself still carries no dimensions**, so
+the DSL a Phase 2 compiler emits keeps describing topology and never
+geometry. The pure half of the calculation (`layout/nodeSizing.ts`) is
+unit-tested; the DOM half (`layout/measureNodes.ts`) is browser-only.
+
 **Nesting inside `<Camera>`:** a `Diagram` rendered as a `Camera`'s
 descendant hands framing over entirely — it registers its node rects (and
 overall bounds, for `focus: "all"`) into the Camera's registry and renders
@@ -249,16 +269,55 @@ Remotion's `useVideoConfig()`, not a DOM measurement.
 `<CameraTarget id>` registers a non-Diagram child's box as a focusable
 target by id (fallback path for content a nested `Diagram` doesn't already
 know about — prefer `focus: { node }` when the subject is a Diagram node).
+Its wrapper is `inline-block`, so it shrink-wraps its child: a block-level
+wrapper would measure the full width of Camera's content area and "focus
+on this" would frame the whole row instead of the subject. Keep it a
+direct child of Camera's content, with no positioned wrapper in between,
+since it measures `offsetLeft`/`offsetTop`.
+
+Target ids share one namespace with the node ids a nested `Diagram`
+registers — don't reuse a node id for a `CameraTarget`.
+
+Both `CameraTarget` and `Diagram` measure only after `fontsReady()`
+resolves, and hold a `delayRender` handle until that first measurement
+lands. Measuring on mount would capture fallback-font metrics, because
+`loadFonts()`'s internal `delayRender` blocks the screenshot but not
+React's mount and effects.
+
+## Scene transitions
+
+A composition renders its timeline through `<SceneSeries>`
+(`src/remotion/compositions/SceneSeries.tsx`), which inserts a transition
+wherever a scene asks for one. The timing lives in `compositions/
+timeline.ts`:
+
+```ts
+type SceneTransition = "cut" | "fade";   // default "cut"
+buildTimeline(scenes, fps, transitionFrames?): TimelineEntry[]
+totalFrames(timeline): number
+```
+
+A transition **overlaps** its two neighbours — TransitionSeries plays the
+outgoing scene's tail and the incoming scene's head at once. So:
+
+- `TimelineEntry.from` is a true absolute position: under a fade the next
+  scene's `from` is pulled back by `overlapWithNext`, matching the offsets
+  TransitionSeries derives internally.
+- The composition's duration is `Σ durations − Σ overlaps`, which is what
+  `totalFrames()` returns. Passing `Σ durations` to `<Composition>` would
+  leave trailing blank frames.
+- `TRANSITION_FRAMES` (15, mirroring `tokens.duration.fast`) is the
+  default; `buildTimeline` throws if a transition is not shorter than both
+  scenes it joins, rather than letting TransitionSeries fail mid-render.
+
+The eval-set videos deliberately use hard cuts at every boundary
+(motife-plan.md §4 compares them frame-for-frame against the Phase 0
+baseline). `ComponentGallery` carries one fade so the path is exercised by
+every `pnpm smoke` run rather than shipping untested.
 
 ## Open items for Phase 2
 
-- `Diagram` node sizing is token-based (`Size` → fixed width/height), not
-  measured from label text — CJK labels that overflow their card are an
-  open risk; `@remotion/layout-utils`' `measureText` is the likely fix.
-- `CameraTarget`'s ref-based measurement (`offsetLeft`/`offsetTop`) has the
-  same theoretical staleness risk `Diagram`'s old `fit` implementation had
-  before it was replaced with SVG `viewBox` scaling — not yet proven out
-  by a real scene.
-- Non-`"cut"` scene transitions (`@remotion/transitions`) aren't wired
-  into `storyboard.ts`/`buildTimeline()` yet — a transition overlaps
-  adjacent scenes and shortens total duration, which isn't accounted for.
+None outstanding — the Phase 1 carry-overs (Diagram node measuring,
+CameraTarget measurement, transition overlap math, and barrel-import
+enforcement) were all closed before Phase 2 began. The barrel rule is now
+enforced by ESLint, not convention; see "Import surface" above.

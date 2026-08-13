@@ -78,4 +78,4 @@ Phase 1 complete (motife-plan.md milestone M1). All 8 planned components built u
 
 **Final status:** done
 **PR / Commit:** PRs #2, #3, #4, #5 (all merged into main; final merge commit 2ca56e7)
-**Follow-ups:** Phase 2 (DSL + compiler). Carried-over open items are recorded in docs/component-library.md: CJK label overflow in fixed-size Diagram nodes, CameraTarget's ref-measurement staleness risk, non-cut scene transitions not yet threaded through buildTimeline(), and the skipped ESLint import-restriction hardening.
+**Follow-ups:** Phase 2 (DSL + compiler). Carried-over open items were recorded in docs/component-library.md: CJK label overflow in fixed-size Diagram nodes, CameraTarget's ref-measurement staleness risk, non-cut scene transitions not yet threaded through buildTimeline(), and the skipped ESLint import-restriction hardening. **All four were closed before Phase 2 began — see [progress/2026-08-13-phase-2-hardening-carryover/](../2026-08-13-phase-2-hardening-carryover/PROGRESS.md).**

@@ -11,6 +11,7 @@ workflow.
 |---|---|---|---|---|---|---|---|
 | `done` | Phase 0 — Anchoring: Manual Baseline Video and Primitive Inventory | `progress/2026-08-12-phase-0-anchor/` | `motife` | N/A | [phase-0-anchor-motife-plan.md](_plans/phase-0-anchor-motife-plan.md) | 2026-08-12 |  |
 | `done` | Phase 1 — 解說元件庫 (Explainer Component Library) | `progress/2026-08-13-phase-1-component-library/` | `motife` | N/A | [phase-1-component-library-plan-next-phase-generic-penguin.md](_plans/phase-1-component-library-plan-next-phase-generic-penguin.md) | 2026-08-13 |  |
+| `in-progress` | Phase 2 pre-work — Phase 1 hardening carry-overs | `progress/2026-08-13-phase-2-hardening-carryover/` | `motife` | N/A | [phase-2-hardening-carryover-plan-next-phase-generic-penguin.md](_plans/phase-2-hardening-carryover-plan-next-phase-generic-penguin.md) | 2026-08-13 |  |
 
 ## Status legend
 
