@@ -5,8 +5,9 @@
 // discipline storyboard.test.ts used to give the (now-retired) hand-written
 // JwtAuthFlow.
 import jwtAuth from "./jwt-auth.json";
+import mqBackpressure from "./mq-backpressure.json";
 
 /** Raw, unvalidated — deliberately typed `unknown`, not `DslDocument`, so
  * nothing downstream can treat these as trusted without going through
  * parseDocument()/parseDocumentOrThrow() first. */
-export const RAW_DOCS: readonly unknown[] = [jwtAuth];
+export const RAW_DOCS: readonly unknown[] = [jwtAuth, mqBackpressure];

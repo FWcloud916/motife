@@ -52,6 +52,17 @@ export const Terminal: FC<TerminalProps> = ({
         overflow: "hidden",
         width: width ? MEASURE_WIDTH[width] : undefined,
         flex: grow ? "1 1 0" : undefined,
+        // Without this, a Terminal stacked below taller siblings in a
+        // height-constrained flex column (e.g. a Callout card sized to
+        // match a neighbouring card via Stack's align="stretch") gets
+        // silently flex-shrunk below its own content height — the DOM
+        // still has the correct, fully-computed step text, but `overflow:
+        // hidden` above clips it away entirely, leaving only the header
+        // bar visibly rendered. flexShrink:0 is what CodeBlock/Diagram get
+        // for free by NOT setting `overflow:hidden` on their own root;
+        // Terminal needs it declared explicitly to keep that clip for its
+        // rounded header corners without it silently eating real content.
+        flexShrink: grow ? undefined : 0,
         boxSizing: "border-box",
       }}
     >
