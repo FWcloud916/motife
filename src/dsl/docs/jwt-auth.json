@@ -82,23 +82,17 @@
         "gap": "lg",
         "children": [
           {
-            "type": "stack",
-            "width": "wide",
-            "children": [
+            "type": "code",
+            "size": "sm",
+            "reveal": { "window": { "from": 0.08, "to": 0.2 } },
+            "lines": [
               {
-                "type": "code",
-                "size": "sm",
-                "reveal": { "window": { "from": 0.08, "to": 0.2 } },
-                "lines": [
-                  {
-                    "segments": [
-                      { "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "tone": "syntaxA" },
-                      ".",
-                      { "text": "eyJzdWIiOiJ1c2VyXzQyIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2NTA3MjAwfQ", "tone": "syntaxB" },
-                      ".",
-                      { "text": "SflKxwRJSMeKKF2QT4fwpMeJf36", "tone": "syntaxC" }
-                    ]
-                  }
+                "segments": [
+                  { "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "tone": "syntaxA" },
+                  ".",
+                  { "text": "eyJzdWIiOiJ1c2VyXzQyIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzg2NTA3MjAwfQ", "tone": "syntaxB" },
+                  ".",
+                  { "text": "SflKxwRJSMeKKF2QT4fwpMeJf36", "tone": "syntaxC" }
                 ]
               }
             ]
@@ -121,7 +115,7 @@
                   {
                     "type": "code",
                     "chrome": "bare",
-                    "size": "sm",
+                    "size": "md",
                     "lines": [
                       { "segments": ["{"] },
                       { "segments": ["\"alg\": \"HS256\","], "indent": 1 },
@@ -144,7 +138,7 @@
                   {
                     "type": "code",
                     "chrome": "bare",
-                    "size": "sm",
+                    "size": "md",
                     "lines": [
                       { "segments": ["{"] },
                       { "segments": ["\"sub\": \"user_42\","], "indent": 1 },
@@ -168,7 +162,7 @@
                   {
                     "type": "code",
                     "chrome": "bare",
-                    "size": "sm",
+                    "size": "md",
                     "lines": [
                       { "segments": ["HMACSHA256("] },
                       { "segments": ["base64url(header) + '.' +"], "indent": 1 },

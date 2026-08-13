@@ -519,10 +519,21 @@ it:
 | v2 — Phase 1 component-library rebuild (hand-written props) | [png](assets/jwt-auth-anatomy-v2.png) | [png](assets/jwt-auth-validation-v2.png) | [png](assets/jwt-auth-summary-v2.png) |
 | v3 — Phase 2 DSL port (same props, now JSON) | [png](assets/jwt-auth-anatomy-v3.png) | [png](assets/jwt-auth-validation-v3.png) | [png](assets/jwt-auth-summary-v3.png) |
 
-v2 → v3 is pixel-identical (`magick compare -metric AE` returns `0` at all
-three frames) — the DSL port and the eventual Stage 7 cutover changed zero
-pixels versus the hand-written-props baseline; only the authoring surface
-changed, from TypeScript to JSON.
+What the pixel-diff gate actually proved: the DSL port is byte-identical
+to the *Stage 1 primitive rewrite* of the TSX scenes (`magick compare
+-metric AE` returns `0` between the two at all three frames), and the
+Stage 7 cutover changed zero pixels versus that. v2 → v3 is **not**
+pixel-identical — the Stage 1 rewrite carries small deliberate deltas
+against v2 (the card captions' divider line has no DSL semantic and was
+dropped; card interiors center rather than pin the caption to the bottom).
+One genuine regression also slipped through that gate — the anatomy
+frame's JWT token bar was wrapped in a `width: "wide"` Stack too narrow
+for its unbreakable 132-char line, overflowing the frame edge — because
+both sides of the A/B shared the bug; it was caught by eye against v2
+post-cutover and fixed in the DSL document (the v3 still above is the
+fixed version). Lesson recorded for Phase 3's critique loop: an A/B
+against the *previous* generation, not just the current baseline, is what
+catches a defect both current candidates share.
 
 ## Open items for Phase 3
 

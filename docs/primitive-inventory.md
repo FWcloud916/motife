@@ -115,7 +115,9 @@ direct comparison:
 - [Summary — v2](assets/jwt-auth-summary-v2.png)
 
 The same three frames again after the Phase 2 DSL port (pixel-identical to
-v2 — see `docs/component-library.md`'s quality-ladder table):
+the Stage 1 primitive rewrite it was A/B'd against; carries small
+deliberate deltas vs v2 — see `docs/component-library.md`'s quality-ladder
+table for the details and one regression that gate missed):
 
 - [JWT anatomy — v3](assets/jwt-auth-anatomy-v3.png)
 - [Claims validation — v3](assets/jwt-auth-validation-v3.png)
