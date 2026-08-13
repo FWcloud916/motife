@@ -1,7 +1,7 @@
 # Phase 2 pre-work — Phase 1 hardening carry-overs
 
 **Slug:** phase-2-hardening-carryover
-**Status:** in-progress
+**Status:** review
 **Ticket:** N/A
 **Related plan:** [phase-2-hardening-carryover-plan-next-phase-generic-penguin.md](../_plans/phase-2-hardening-carryover-plan-next-phase-generic-penguin.md)
 **Created:** 2026-08-13
@@ -60,6 +60,7 @@ into five commits so each concern is reviewable on its own.
 
 -
 - All four carry-overs implemented across 5 commits on phase-2/hardening-carryover. Item 4 (ESLint) went first so every later commit was written under the rule; verified by deliberate violation at both import depths rather than by inspection. Item 3 introduced compositions/timeline.ts (pure, parameterized, unit-tested) plus a shared SceneSeries component, so the transition wiring exists once and ComponentGallery's fade exercises the exact path the eval-set videos would use — JWT stays all-cut and TOTAL_FRAMES is pinned at 1200 by a new storyboard.test.ts. Item 1 added fontsReady() as the shared correctness gate (loadFonts' delayRender blocks the screenshot but not React's effects, so measuring on mount captures fallback-font metrics), then split the sizing into a node-testable pure rule and a browser-only measurer; computeLayout takes an optional nodeSizes record so GraphSpec still carries no geometry. Item 2 reused the same fontsReady gate plus a labelled delayRender handshake and per-commit re-measure. Verified by rendering at every step, which caught two things static checks could not: the long-CJK cap/wrap behaviour, and CameraTarget measuring full-width as a block element (fixed with inline-block shrink-wrap). pnpm verify green: 56 tests, both compositions smoke-rendered, gallery now 615 frames per the overlap math.
+- Opened PR #7 (https://github.com/FWcloud916/motife/pull/7) into main.
 
 ## Outcome
 
