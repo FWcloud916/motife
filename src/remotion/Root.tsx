@@ -2,7 +2,6 @@ import { Composition } from "remotion";
 import { loadFonts } from "../components/tokens";
 import { ComponentGallery, GALLERY_TOTAL_FRAMES } from "./compositions/gallery/ComponentGallery";
 import { JwtAuthFlow } from "./compositions/jwt-auth/JwtAuthFlow";
-import { JwtAuthFlowV2 } from "./compositions/jwt-auth/JwtAuthFlowV2";
 import { FPS, WIDTH, HEIGHT, TOTAL_FRAMES } from "./compositions/jwt-auth/storyboard";
 
 // Registers every font the component library depends on (Inter, Noto Sans
@@ -21,15 +20,6 @@ export const RemotionRoot: React.FC = () => (
     <Composition
       id="JwtAuthFlow"
       component={JwtAuthFlow}
-      durationInFrames={TOTAL_FRAMES}
-      fps={FPS}
-      width={WIDTH}
-      height={HEIGHT}
-      defaultProps={{}}
-    />
-    <Composition
-      id="JwtAuthFlowV2"
-      component={JwtAuthFlowV2}
       durationInFrames={TOTAL_FRAMES}
       fps={FPS}
       width={WIDTH}
