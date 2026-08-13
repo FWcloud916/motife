@@ -1,0 +1,72 @@
+# Phase 1 — 解說元件庫 (Explainer Component Library)
+
+**Slug:** phase-1-component-library
+**Status:** in-progress
+**Ticket:** N/A
+**Related plan:** [phase-1-component-library-plan-next-phase-generic-penguin.md](../_plans/phase-1-component-library-plan-next-phase-generic-penguin.md)
+**Created:** 2026-08-13
+**Updated:** 2026-08-13
+
+---
+
+## Scope
+
+| Scope | Branch | Ticket | Notes |
+|---|---|---|---|
+| `motife` | `phase-1/tokens-and-foundation` | N/A |  |
+
+## Background & goals
+
+Phase 0 (anchoring) shipped a hand-built 40s `JwtAuthFlow` baseline video
+using ad-hoc, copy-pasted visual primitives
+(`src/remotion/compositions/jwt-auth/visuals.tsx`) and a primitive inventory
+(`docs/primitive-inventory.md`) cataloging what got reused. Per
+`motife-plan.md` §3 Phase 1, this phase refactors those primitives into a
+parameterized, design-token-driven component library under `src/components/`:
+`Scene`, `Diagram`, `FlowPulse`, `CodeBlock`, `Terminal`, `Camera`,
+`StepReveal`, `Callout`, plus supporting `tokens/`, `motion/`, `icons/`, and
+`layout/` modules. Components must accept only semantic, JSON-serializable
+props (no `style`/`className`/`boxShadow`) so Phase 2's DSL compiler can
+emit them verbatim, and all timing must be expressed as fractions of the
+enclosing Scene's duration so Phase 3's TTS-driven durations re-time
+everything automatically.
+
+Acceptance (motife-plan.md milestone M1): rebuild the JWT video using only
+the component library with hand-written props, at quality no worse than the
+manual Phase 0 version.
+
+Delivered as 4 sequential PRs into `main`, each passing `pnpm verify` with
+the Phase 0 baseline still rendering throughout:
+1. `phase-1/tokens-and-foundation` — tokens, fonts, motion helpers, vitest,
+   Scene/Callout/StepReveal/Icon registry.
+2. `phase-1/diagram-flow-code` — Diagram+dagre layout, FlowPulse, CodeBlock,
+   Terminal, Camera, ComponentGallery demo composition.
+3. `phase-1/jwt-rebuild` — JwtAuthFlowV2 acceptance rebuild, parallel to the
+   untouched baseline.
+4. `phase-1/swap-and-cleanup` — swap v2 into the `JwtAuthFlow` id, delete
+   Phase 0 primitives, docs updates.
+
+Full design detail in the linked plan snapshot.
+
+## Task list
+
+- [x] PR 1 — tokens-and-foundation (tokens/fonts/motion/vitest + Scene, Callout, StepReveal, Icon registry)
+- [ ] PR 2 — diagram-flow-code (Diagram+dagre, FlowPulse, CodeBlock, Terminal, Camera, ComponentGallery)
+- [ ] PR 3 — jwt-rebuild (JwtAuthFlowV2 acceptance rebuild + transitions)
+- [ ] PR 4 — swap-and-cleanup (swap into JwtAuthFlow id, delete old primitives, docs)
+
+## Work log
+
+### 2026-08-13
+
+-
+- Starting PR 1 (tokens-and-foundation) on branch phase-1/tokens-and-foundation.
+- PR 1 (tokens-and-foundation) complete on branch phase-1/tokens-and-foundation: src/components/tokens (color/tone recipes, fontFamily, easing, spacing/duration/radius carried over from theme.ts), tokens/fonts.ts (Inter/NotoSansTC/JetBrainsMono via @remotion/google-fonts, CJK weights trimmed 4->2 to cut ~400 render-time network requests to ~200), motion/{timing,progress}.ts (pure, vitest-covered: resolveWindow/resolveSteps/stepStateAtFrame), icons/{registry,Icon}.tsx (11 IconNames, +cross/database/queue/lock/document), Scene/{Scene,SceneContext,Background}.tsx, Callout/Callout.tsx (pill/card/banner), StepReveal/StepReveal.tsx (+ exported useSteps hook for sibling-panel sync). theme.ts is now a deprecated re-export shim over src/components/tokens so Phase 0 scenes compile unchanged. Root.tsx calls loadFonts() once. vitest added, pnpm verify green (14 tests, typecheck+lint+smoke all pass). Baseline stills eyeballed against docs/assets/*.png for font-change parity -- visually identical.
+
+## Outcome
+
+> Fill in after development finishes.
+
+**Final status:**
+**PR / Commit:**
+**Follow-ups:**

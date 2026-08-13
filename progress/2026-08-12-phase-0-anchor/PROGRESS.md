@@ -1,11 +1,11 @@
 # Phase 0 — Anchoring: Manual Baseline Video and Primitive Inventory
 
 **Slug:** phase-0-anchor
-**Status:** in-progress
+**Status:** done
 **Ticket:** N/A
 **Related plan:** [phase-0-anchor-motife-plan.md](../_plans/phase-0-anchor-motife-plan.md)
 **Created:** 2026-08-12
-**Updated:** 2026-08-12
+**Updated:** 2026-08-13
 
 ---
 
@@ -39,10 +39,15 @@ Exit criteria: one hand-built video the author is satisfied with, plus a primiti
 - Completed the 40-second `JwtAuthFlow` manual baseline: four finished scenes explain token issuance, Header/Payload/Signature anatomy, server-side signature and claims verification, and operational takeaways. Added narration copy (audio remains deferred to Phase 3's TTS-first timeline), a Phase 0 visual-primitives module, ten observed primitive entries, design-token coverage, and three committed baseline stills. Static checks and the eight-frame render smoke test pass.
 - Eval set confirmed as proposed: (1) JWT auth flow (Phase 0 baseline, done), (2) message queue backpressure, (3) DB index internals. Selection rationale: author can personally judge output quality for all three, and each stresses a different visual-primitive shape (flow/checklist vs. continuous dynamics vs. tree layout), keeping the component library from overfitting one topic shape.
 
+### 2026-08-13
+
+- PR #1 merged (commit 20dc9ba). Closing out item.
+- Closed item as `done`.
+
 ## Outcome
 
-> Fill in after development finishes.
+Manual baseline JwtAuthFlow video (4 scenes, 40s), primitive inventory (10 primitives cataloged), license check, and pnpm verify gate all complete.
 
-**Final status:**
-**PR / Commit:**
-**Follow-ups:**
+**Final status:** done
+**PR / Commit:** PR #1 (merged, commit 20dc9ba)
+**Follow-ups:** Phase 1 component library work, tracked in progress/2026-08-13-phase-1-component-library/

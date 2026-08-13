@@ -27,3 +27,4 @@ minimumReleaseAgeExclude:
   - '@remotion/zod-types@4.0.508'
   - remotion@4.0.508
   - '@remotion/eslint-config-flat@4.0.508'
+  - '@remotion/google-fonts@4.0.508'
