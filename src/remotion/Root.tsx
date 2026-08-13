@@ -7,12 +7,14 @@ import { DslVideo } from "../compiler/render";
 import type { DslVideoProps } from "../compiler/render";
 import { RAW_DOCS } from "../dsl/docs/manifest";
 import { ComponentGallery, GALLERY_TOTAL_FRAMES } from "./compositions/gallery/ComponentGallery";
-import { JwtAuthFlow } from "./compositions/jwt-auth/JwtAuthFlow";
-import { FPS, WIDTH, HEIGHT, TOTAL_FRAMES } from "./compositions/jwt-auth/storyboard";
+import { FPS, WIDTH, HEIGHT } from "./compositions/videoDefaults";
 
-// Stage 4: JwtAuthFlowDsl, the DSL port of the same baseline JwtAuthFlow
-// renders below — registered side by side under a temporary id for A/B
-// comparison. Parsed at module scope, like BLANK_DOC below: a malformed
+// Every eval-set baseline (JwtAuthFlow, MqBackpressure, DbIndexInternals) is
+// a DSL document now — the hand-written jwt-auth/ TSX scenes this used to
+// A/B against were deleted once the port was verified byte-identical
+// (Stage 4's exit gate). ComponentGallery is the one composition that stays
+// TSX permanently (component showcase, not an eval-set video — see
+// CLAUDE.md). Parsed at module scope, like BLANK_DOC below: a malformed
 // baseline fails the bundle loudly rather than rendering garbage.
 //
 // Deliberately a LITERAL durationInFrames per doc (via dslTimeline, not
@@ -96,15 +98,6 @@ loadFonts();
 // <Composition /> entries (the eval-set siblings) are expected here later.
 export const RemotionRoot: React.FC = () => (
   <>
-    <Composition
-      id="JwtAuthFlow"
-      component={JwtAuthFlow}
-      durationInFrames={TOTAL_FRAMES}
-      fps={FPS}
-      width={WIDTH}
-      height={HEIGHT}
-      defaultProps={{}}
-    />
     <Composition
       id="ComponentGallery"
       component={ComponentGallery}

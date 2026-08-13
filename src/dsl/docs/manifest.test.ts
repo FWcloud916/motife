@@ -4,14 +4,15 @@ import { dslTimeline, dslTotalFrames } from "../../compiler/timeline";
 import { RAW_DOCS } from "./manifest";
 
 // Pins each baseline document's frame count and scene offsets — the DSL
-// generalisation of storyboard.test.ts's old single-composition pin.
-// JwtAuthFlowDsl keeps the exact numbers the Phase 0/1 baseline had
-// (1200 frames, offsets [0, 180, 480, 1020]): its durationInSeconds are
-// unchanged (6/10/18/6) and every transition is still "cut", so the
-// timeline math resolves identically — this pin is what proves the DSL
-// port didn't silently drift the baseline's timing.
+// generalisation of the now-deleted storyboard.test.ts's old
+// single-composition pin. JwtAuthFlow keeps the exact numbers the Phase 0/1
+// hand-written baseline had (1200 frames, offsets [0, 180, 480, 1020]): its
+// durationInSeconds are unchanged (6/10/18/6) and every transition is still
+// "cut", so the timeline math resolves identically — this pin is what
+// proves the DSL port never drifted the baseline's timing, from Stage 4's
+// A/B all the way through the Stage 7 cutover.
 const FRAME_PINS: Record<string, { total: number; from: number[] }> = {
-  JwtAuthFlowDsl: { total: 1200, from: [0, 180, 480, 1020] },
+  JwtAuthFlow: { total: 1200, from: [0, 180, 480, 1020] },
   // 7 + 11 + 16 + 6 = 40s @ 30fps, all cuts.
   MqBackpressure: { total: 1200, from: [0, 210, 540, 1020] },
   // 7 + 12 + 16 + 7 = 42s @ 30fps, all cuts.

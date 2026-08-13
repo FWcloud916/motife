@@ -20,7 +20,7 @@ import type { GraphSpec } from "../../../components";
 import { SceneSeries } from "../SceneSeries";
 import type { SceneComponentProps } from "../SceneSeries";
 import { buildTimeline, totalFrames } from "../timeline";
-import { FPS } from "../jwt-auth/storyboard";
+import { FPS } from "../videoDefaults";
 
 // The gallery is also where a non-cut transition is actually rendered:
 // the eval-set videos all use hard cuts (regression policy), so without a
