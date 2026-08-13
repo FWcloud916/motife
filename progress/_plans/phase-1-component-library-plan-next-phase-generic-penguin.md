@@ -19,7 +19,7 @@ Guiding rules (from motife-plan.md §2 + AGENTS.md hard constraints):
 
 ## Directory structure
 
-```
+```text
 src/components/            # reserved by docs/project-overview.md §4; only public surface is index.ts
 ├── index.ts               # barrel — scenes import ONLY from here
 ├── tokens/                # index.ts (tokens), easing.ts, fonts.ts
@@ -77,7 +77,7 @@ Rebuild the JWT video only from `src/components/*`, as a **parallel composition*
 
 ## Install summary
 
-```
+```text
 PR 1: npx remotion add google-fonts   + allowlist '@remotion/google-fonts@4.0.508' ; pnpm add -D vitest
 PR 2: pnpm add @dagrejs/dagre ; npx remotion add paths        + allowlist '@remotion/paths@4.0.508'
 PR 3: npx remotion add transitions    + allowlist '@remotion/transitions@4.0.508'
