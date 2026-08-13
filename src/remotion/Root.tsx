@@ -1,5 +1,5 @@
 import { Composition } from "remotion";
-import { loadFonts } from "../components/tokens";
+import { loadFonts } from "../components";
 import { ComponentGallery, GALLERY_TOTAL_FRAMES } from "./compositions/gallery/ComponentGallery";
 import { JwtAuthFlow } from "./compositions/jwt-auth/JwtAuthFlow";
 import { FPS, WIDTH, HEIGHT, TOTAL_FRAMES } from "./compositions/jwt-auth/storyboard";
