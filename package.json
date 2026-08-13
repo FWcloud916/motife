@@ -29,7 +29,8 @@
     "@remotion/transitions": "4.0.508",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "remotion": "4.0.508"
+    "remotion": "4.0.508",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@remotion/bundler": "4.0.508",

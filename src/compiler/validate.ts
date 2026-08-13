@@ -1,0 +1,807 @@
+// Semantic cross-reference checks — everything zod's structural schema
+// can't see: a WindowRef's track must exist, a diagram's edge must name a
+// declared node, a camera's focus must resolve, a track must be declared
+// before another track references it. Operates on an already zod-parsed
+// DslDocument, so every shape here is trusted; this file only checks
+// relationships BETWEEN values.
+//
+// One function per concern, composed by `validateDocument()`. Every
+// pushed DslIssue names a real path and a concrete fix — see
+// src/compiler/errors.ts's file header for why that discipline matters
+// (these strings are Phase 3's retry feedback).
+import type { DslDocument, DslNode, DslScene, Track, WindowRef } from "../dsl";
+import type { DslIssue, DslIssueCode } from "./errors";
+import { quoteList } from "./path";
+import {
+  StepIndexOutOfRangeError,
+  TrackCycleError,
+  UnknownTrackError,
+  resolveWindowRef,
+} from "./windows";
+
+// Mirrors src/remotion/compositions/timeline.ts's TRANSITION_FRAMES. Kept
+// as its own literal rather than importing that module — src/compiler/**
+// stays independent of src/remotion/**, the same discipline timeline.ts
+// itself uses to avoid pulling in the component barrel. If the shared
+// default ever changes it changes in both places; a mismatch here only
+// makes this warning's arithmetic slightly conservative, it can't produce
+// a false negative that lets a genuinely-too-short transition through
+// (buildTimeline's own runtime check is still the final word at render time).
+const TRANSITION_FRAMES = 15;
+
+const BEAT_ORDER = ["intro", "breakdown", "walkthrough", "summary"] as const;
+
+// A comfortable narration pace for the mostly-Mandarin content this DSL
+// targets. Provisional (motife-plan.md §2 決策4: Phase 3 replaces
+// durationInSeconds with a TTS-measured value) — this is the one automatic
+// check that today's hand-picked durations are plausible in the meantime.
+const COMFORTABLE_CHARS_PER_SEC = 8;
+const TOO_FAST_MULTIPLIER = 1.5;
+const TOO_SLOW_MULTIPLIER = 0.3;
+
+function issue(
+  path: string,
+  code: DslIssueCode,
+  severity: DslIssue["severity"],
+  message: string,
+  fix: string,
+): DslIssue {
+  return { path, code, severity, message, fix };
+}
+
+export function validateDocument(doc: DslDocument): DslIssue[] {
+  const issues: DslIssue[] = [];
+
+  issues.push(...checkSceneIds(doc));
+  issues.push(...checkBeatOrder(doc));
+  issues.push(...checkTransitions(doc));
+
+  doc.scenes.forEach((scene, sceneIndex) => {
+    issues.push(...validateScene(scene, sceneIndex));
+  });
+
+  return issues;
+}
+
+function checkSceneIds(doc: DslDocument): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const seen = new Set<string>();
+  doc.scenes.forEach((scene, index) => {
+    if (seen.has(scene.id)) {
+      issues.push(
+        issue(
+          `scenes[${index}].id`,
+          "duplicate_scene_id",
+          "error",
+          `Scene id "${scene.id}" is used by more than one scene.`,
+          `give this scene a unique id — already used: ${quoteList(seen)}.`,
+        ),
+      );
+    }
+    seen.add(scene.id);
+  });
+  return issues;
+}
+
+function checkBeatOrder(doc: DslDocument): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const beats = doc.scenes.map((scene) => scene.beat);
+
+  const introCount = beats.filter((beat) => beat === "intro").length;
+  if (introCount !== 1 || beats[0] !== "intro") {
+    issues.push(
+      issue(
+        "scenes",
+        "beat_order",
+        "error",
+        `Expected exactly one "intro" scene, first in the document; found ${introCount}${
+          beats[0] !== "intro" ? `, and scenes[0].beat is "${beats[0]}"` : ""
+        }.`,
+        `make scenes[0].beat "intro", and make sure no other scene uses beat "intro".`,
+      ),
+    );
+  }
+
+  const summaryCount = beats.filter((beat) => beat === "summary").length;
+  const lastBeat = beats[beats.length - 1];
+  if (summaryCount !== 1 || lastBeat !== "summary") {
+    issues.push(
+      issue(
+        "scenes",
+        "beat_order",
+        "error",
+        `Expected exactly one "summary" scene, last in the document; found ${summaryCount}${
+          lastBeat !== "summary" ? `, and the last scene's beat is "${lastBeat}"` : ""
+        }.`,
+        `make the last scene's beat "summary", and make sure no other scene uses beat "summary".`,
+      ),
+    );
+  }
+
+  if (!beats.includes("breakdown")) {
+    issues.push(
+      issue(
+        "scenes",
+        "beat_order",
+        "error",
+        `No scene has beat "breakdown" — the narrative skeleton requires 引入 → 拆解 → 逐步演示 → 總結.`,
+        `add at least one scene with beat "breakdown" between the intro and walkthrough scenes.`,
+      ),
+    );
+  }
+  if (!beats.includes("walkthrough")) {
+    issues.push(
+      issue(
+        "scenes",
+        "beat_order",
+        "error",
+        `No scene has beat "walkthrough" — the narrative skeleton requires 引入 → 拆解 → 逐步演示 → 總結.`,
+        `add at least one scene with beat "walkthrough" between the breakdown and summary scenes.`,
+      ),
+    );
+  }
+
+  let prevRank = -1;
+  beats.forEach((beat, index) => {
+    const rank = BEAT_ORDER.indexOf(beat);
+    if (rank < prevRank) {
+      issues.push(
+        issue(
+          `scenes[${index}].beat`,
+          "beat_order",
+          "error",
+          `scenes[${index}] has beat "${beat}", which comes before the preceding scene's beat "${
+            beats[index - 1]
+          }" in the fixed order intro → breakdown → walkthrough → summary.`,
+          `reorder scenes so beats are non-decreasing in intro → breakdown → walkthrough → summary order.`,
+        ),
+      );
+    }
+    prevRank = Math.max(prevRank, rank);
+  });
+
+  return issues;
+}
+
+function checkTransitions(doc: DslDocument): DslIssue[] {
+  const issues: DslIssue[] = [];
+  doc.scenes.forEach((scene, index) => {
+    const isLast = index === doc.scenes.length - 1;
+    const transition = isLast ? "cut" : (scene.transitionToNext ?? "cut");
+    if (transition !== "fade") return;
+
+    const next = doc.scenes[index + 1];
+    const durationFrames = Math.round(scene.durationInSeconds * doc.fps);
+    const nextFrames = Math.round(next.durationInSeconds * doc.fps);
+    if (TRANSITION_FRAMES >= durationFrames || TRANSITION_FRAMES >= nextFrames) {
+      const minSeconds = (TRANSITION_FRAMES / doc.fps).toFixed(2);
+      issues.push(
+        issue(
+          `scenes[${index}].transitionToNext`,
+          "transition_too_long",
+          "error",
+          `The fade from "${scene.id}" to "${next.id}" needs ${TRANSITION_FRAMES} frames of overlap, but "${scene.id}" is ${durationFrames} frames and "${next.id}" is ${nextFrames} frames.`,
+          `use "cut" instead, or raise durationInSeconds on "${scene.id}" and/or "${next.id}" to more than ${minSeconds}s.`,
+        ),
+      );
+    }
+  });
+  return issues;
+}
+
+function checkNarrationPacing(scene: DslScene, sceneIndex: number): DslIssue[] {
+  const charsPerSec = scene.narration.length / scene.durationInSeconds;
+  const path = `scenes[${sceneIndex}].narration`;
+  if (charsPerSec > COMFORTABLE_CHARS_PER_SEC * TOO_FAST_MULTIPLIER) {
+    const suggestedSeconds = Math.ceil(scene.narration.length / COMFORTABLE_CHARS_PER_SEC);
+    return [
+      issue(
+        path,
+        "narration_pacing",
+        "warning",
+        `Narration is ${scene.narration.length} characters but the scene is ${scene.durationInSeconds}s — about ${charsPerSec.toFixed(1)} chars/sec, faster than a comfortable pace (~${COMFORTABLE_CHARS_PER_SEC} chars/sec).`,
+        `shorten the narration, or raise scenes[${sceneIndex}].durationInSeconds to about ${suggestedSeconds}.`,
+      ),
+    ];
+  }
+  if (charsPerSec < COMFORTABLE_CHARS_PER_SEC * TOO_SLOW_MULTIPLIER) {
+    const suggestedSeconds = Math.max(1, Math.round(scene.narration.length / COMFORTABLE_CHARS_PER_SEC));
+    return [
+      issue(
+        path,
+        "narration_pacing",
+        "warning",
+        `Narration is only ${scene.narration.length} characters for a ${scene.durationInSeconds}s scene — about ${charsPerSec.toFixed(1)} chars/sec, slower than a comfortable pace (~${COMFORTABLE_CHARS_PER_SEC} chars/sec).`,
+        `add more narration, or lower scenes[${sceneIndex}].durationInSeconds to about ${suggestedSeconds}.`,
+      ),
+    ];
+  }
+  return [];
+}
+
+function validateScene(scene: DslScene, sceneIndex: number): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const scenePath = `scenes[${sceneIndex}]`;
+
+  issues.push(...checkNarrationPacing(scene, sceneIndex));
+
+  const { trackIssues, trackMap } = validateTracks(scene, sceneIndex);
+  issues.push(...trackIssues);
+
+  const usedTracks = new Set<string>();
+  issues.push(
+    ...walkNode(scene.content, `${scenePath}.content`, trackMap, usedTracks),
+  );
+
+  (scene.tracks ?? []).forEach((track, trackIndex) => {
+    if (!usedTracks.has(track.id)) {
+      issues.push(
+        issue(
+          `${scenePath}.tracks[${trackIndex}]`,
+          "unused_track",
+          "warning",
+          `Track "${track.id}" is declared but never referenced by a window, "steps" node, or "switch" node in this scene.`,
+          `reference it (e.g. { "track": "${track.id}", "step": 0 }), or remove the track.`,
+        ),
+      );
+    }
+  });
+
+  return issues;
+}
+
+function validateTracks(
+  scene: DslScene,
+  sceneIndex: number,
+): { trackIssues: DslIssue[]; trackMap: Map<string, Track> } {
+  const issues: DslIssue[] = [];
+  const declaredSoFar = new Map<string, Track>();
+  const tracks = scene.tracks ?? [];
+
+  tracks.forEach((track, trackIndex) => {
+    const path = `scenes[${sceneIndex}].tracks[${trackIndex}]`;
+
+    if (declaredSoFar.has(track.id)) {
+      issues.push(
+        issue(
+          `${path}.id`,
+          "duplicate_track_id",
+          "error",
+          `Track id "${track.id}" is used by more than one track in this scene.`,
+          `give this track a unique id — already used: ${quoteList(declaredSoFar.keys())}.`,
+        ),
+      );
+    } else if (!("from" in track.window)) {
+      const refId = track.window.track;
+      if (refId === track.id) {
+        issues.push(
+          issue(
+            `${path}.window.track`,
+            "track_forward_reference",
+            "error",
+            `Track "${track.id}" references itself in its own window.`,
+            `reference an earlier-declared track, or use an absolute {"from": …, "to": …} window.`,
+          ),
+        );
+      } else if (!declaredSoFar.has(refId)) {
+        issues.push(
+          issue(
+            `${path}.window.track`,
+            "track_forward_reference",
+            "error",
+            `Track "${track.id}" references track "${refId}", which isn't declared yet at this point in scenes[${sceneIndex}].tracks.`,
+            `move "${refId}" earlier in the tracks array (a track may only reference an earlier-declared track), or use an absolute {"from": …, "to": …} window.`,
+          ),
+        );
+      }
+    }
+
+    declaredSoFar.set(track.id, track);
+  });
+
+  return { trackIssues: issues, trackMap: declaredSoFar };
+}
+
+/** Resolves a WindowRef purely to validate it (unknown track, bad step
+ * index, cycle), converting windows.ts's thrown errors into a DslIssue at
+ * the caller-supplied path. Swallows nothing else — a bug in
+ * resolveWindowRef itself should still throw. */
+function checkWindowRef(ref: WindowRef, path: string, trackMap: Map<string, Track>, usedTracks: Set<string>): DslIssue[] {
+  if ("from" in ref) {
+    if (ref.from >= ref.to) {
+      return [
+        issue(
+          path,
+          "window_order",
+          "error",
+          `Window "from" (${ref.from}) must be less than "to" (${ref.to}).`,
+          `swap or adjust the values so from < to.`,
+        ),
+      ];
+    }
+    return [];
+  }
+
+  usedTracks.add(ref.track);
+  try {
+    resolveWindowRef(ref, trackMap);
+    return [];
+  } catch (error) {
+    if (error instanceof UnknownTrackError) {
+      return [
+        issue(
+          `${path}.track`,
+          "unknown_track",
+          "error",
+          error.message,
+          trackMap.size > 0
+            ? `use one of the declared tracks: ${quoteList(trackMap.keys())}.`
+            : `this scene declares no tracks — add one to scenes[].tracks, or use an absolute {"from": …, "to": …} window.`,
+        ),
+      ];
+    }
+    if (error instanceof StepIndexOutOfRangeError) {
+      return [
+        issue(
+          path,
+          "step_index_out_of_range",
+          "error",
+          error.message,
+          `use an index between 0 and ${error.itemCount - 1}, or add more items to track "${error.trackId}".`,
+        ),
+      ];
+    }
+    if (error instanceof TrackCycleError) {
+      return [
+        issue(
+          `${path}.track`,
+          "track_forward_reference",
+          "error",
+          error.message,
+          `break the cycle — a track's window must eventually resolve to an absolute {"from": …, "to": …}.`,
+        ),
+      ];
+    }
+    throw error;
+  }
+}
+
+/** Recursively walks a content node, collecting every semantic issue and
+ * every track referenced (for the unused_track check) along the way. One
+ * function handles all 14 node types via a switch, rather than one walker
+ * per type, since the recursion (finding every WindowRef and every child
+ * node) is identical work for all of them. */
+function walkNode(
+  node: DslNode,
+  path: string,
+  trackMap: Map<string, Track>,
+  usedTracks: Set<string>,
+): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const checkWindow = (ref: WindowRef | undefined, subPath: string) =>
+    ref ? issues.push(...checkWindowRef(ref, subPath, trackMap, usedTracks)) : undefined;
+  const recurse = (child: DslNode, subPath: string) =>
+    issues.push(...walkNode(child, subPath, trackMap, usedTracks));
+
+  switch (node.type) {
+    case "stack":
+      checkWindow(node.window, `${path}.window`);
+      (node.children ?? []).forEach((child, i) => recurse(child, `${path}.children[${i}]`));
+      break;
+
+    case "text":
+      checkWindow(node.window, `${path}.window`);
+      break;
+
+    case "meter":
+      checkWindow(node.window, `${path}.window`);
+      break;
+
+    case "icon":
+      break;
+
+    case "pill":
+    case "banner":
+      checkWindow(node.window, `${path}.window`);
+      break;
+
+    case "card":
+      checkWindow(node.window, `${path}.window`);
+      node.children.forEach((child, i) => recurse(child, `${path}.children[${i}]`));
+      break;
+
+    case "diagram":
+      issues.push(...validateDiagram(node, path, trackMap, usedTracks));
+      break;
+
+    case "code":
+      issues.push(...validateCode(node, path, trackMap, usedTracks));
+      break;
+
+    case "terminal":
+      node.steps.forEach((step, i) => checkWindow(step.window, `${path}.steps[${i}].window`));
+      break;
+
+    case "camera":
+      issues.push(...validateCamera(node, path, trackMap, usedTracks));
+      break;
+
+    case "cameraTarget":
+      recurse(node.child, `${path}.child`);
+      break;
+
+    case "steps":
+      if (!trackMap.has(node.track)) {
+        issues.push(
+          issue(
+            `${path}.track`,
+            "unknown_track",
+            "error",
+            `Unknown track "${node.track}".`,
+            trackMap.size > 0
+              ? `use one of the declared tracks: ${quoteList(trackMap.keys())}.`
+              : `this scene declares no tracks — add one to scenes[].tracks.`,
+          ),
+        );
+      } else {
+        usedTracks.add(node.track);
+      }
+      checkWindow(node.window, `${path}.window`);
+      break;
+
+    case "switch":
+      issues.push(...validateSwitch(node, path, trackMap, usedTracks));
+      break;
+  }
+
+  return issues;
+}
+
+function validateDiagram(
+  node: Extract<DslNode, { type: "diagram" }>,
+  path: string,
+  trackMap: Map<string, Track>,
+  usedTracks: Set<string>,
+): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const checkWindow = (ref: WindowRef | undefined, subPath: string) =>
+    ref ? issues.push(...checkWindowRef(ref, subPath, trackMap, usedTracks)) : undefined;
+
+  const nodeIds = new Set<string>();
+  node.graph.nodes.forEach((graphNode, i) => {
+    if (nodeIds.has(graphNode.id)) {
+      issues.push(
+        issue(
+          `${path}.graph.nodes[${i}].id`,
+          "duplicate_graph_node_id",
+          "error",
+          `Node id "${graphNode.id}" is used by more than one node in this diagram.`,
+          `give this node a unique id — already used: ${quoteList(nodeIds)}.`,
+        ),
+      );
+    }
+    nodeIds.add(graphNode.id);
+  });
+
+  const edgeIds = new Set<string>();
+  node.graph.edges.forEach((edge, i) => {
+    const edgeId = edge.id ?? `${edge.from}->${edge.to}`;
+    if (edgeIds.has(edgeId)) {
+      issues.push(
+        issue(
+          `${path}.graph.edges[${i}]`,
+          "duplicate_edge_id",
+          "error",
+          `Edge id "${edgeId}" is used by more than one edge in this diagram.`,
+          `set an explicit "id" on one of the two edges — already used: ${quoteList(edgeIds)}.`,
+        ),
+      );
+    }
+    edgeIds.add(edgeId);
+
+    if (!nodeIds.has(edge.from)) {
+      issues.push(
+        issue(
+          `${path}.graph.edges[${i}].from`,
+          "unknown_graph_node",
+          "error",
+          `Edge references unknown node "${edge.from}".`,
+          `use a node id declared in this diagram's graph.nodes: ${quoteList(nodeIds)}.`,
+        ),
+      );
+    }
+    if (!nodeIds.has(edge.to)) {
+      issues.push(
+        issue(
+          `${path}.graph.edges[${i}].to`,
+          "unknown_graph_node",
+          "error",
+          `Edge references unknown node "${edge.to}".`,
+          `use a node id declared in this diagram's graph.nodes: ${quoteList(nodeIds)}.`,
+        ),
+      );
+    }
+  });
+
+  (node.activeNodes ?? []).forEach((entry, i) => {
+    if (typeof entry === "string") {
+      if (!nodeIds.has(entry)) {
+        issues.push(
+          issue(
+            `${path}.activeNodes[${i}]`,
+            "unknown_graph_node",
+            "error",
+            `activeNodes references unknown node "${entry}".`,
+            `use a node id declared in this diagram's graph.nodes: ${quoteList(nodeIds)}.`,
+          ),
+        );
+      }
+      return;
+    }
+    if (!nodeIds.has(entry.node)) {
+      issues.push(
+        issue(
+          `${path}.activeNodes[${i}].node`,
+          "unknown_graph_node",
+          "error",
+          `activeNodes references unknown node "${entry.node}".`,
+          `use a node id declared in this diagram's graph.nodes: ${quoteList(nodeIds)}.`,
+        ),
+      );
+    }
+    checkWindow(entry.window, `${path}.activeNodes[${i}].window`);
+  });
+
+  checkWindow(node.reveal?.window, `${path}.reveal.window`);
+
+  (node.flows ?? []).forEach((flow, i) => {
+    if (!edgeIds.has(flow.edge)) {
+      issues.push(
+        issue(
+          `${path}.flows[${i}].edge`,
+          "unknown_edge",
+          "error",
+          `Unknown edge "${flow.edge}".`,
+          `use an edge id declared in this diagram's graph.edges: ${quoteList(edgeIds)}. An edge's id defaults to "<from>-><to>" unless it sets an explicit "id".`,
+        ),
+      );
+    }
+    checkWindow(flow.window, `${path}.flows[${i}].window`);
+  });
+
+  return issues;
+}
+
+function validateCode(
+  node: Extract<DslNode, { type: "code" }>,
+  path: string,
+  trackMap: Map<string, Track>,
+  usedTracks: Set<string>,
+): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const checkWindow = (ref: WindowRef | undefined, subPath: string) =>
+    ref ? issues.push(...checkWindowRef(ref, subPath, trackMap, usedTracks)) : undefined;
+
+  checkWindow(node.reveal?.window, `${path}.reveal.window`);
+
+  (node.highlights ?? []).forEach((highlight, i) => {
+    const [start, end] = highlight.lines;
+    const maxLine = node.lines.length - 1;
+    if (start > maxLine || end > maxLine) {
+      issues.push(
+        issue(
+          `${path}.highlights[${i}].lines`,
+          "step_index_out_of_range",
+          "error",
+          `Highlight line range [${start}, ${end}] is out of bounds — this code block has ${node.lines.length} line(s) (valid indices 0-${maxLine}).`,
+          `use a range within 0-${maxLine}, or add more lines.`,
+        ),
+      );
+    }
+    checkWindow(highlight.window, `${path}.highlights[${i}].window`);
+  });
+
+  return issues;
+}
+
+/** Collects every diagram-node-id and cameraTarget-id inside a camera's
+ * subtree, WITHOUT crossing into a nested camera (which has its own
+ * independent registry — motife-plan.md's Camera design mirrors
+ * src/components/Camera/CameraRegistryContext.ts here). Also recurses for
+ * the normal per-node checks (diagram edge validity, etc.) via the shared
+ * walkNode, and collects WindowRef/track usage the same way. */
+function validateCamera(
+  node: Extract<DslNode, { type: "camera" }>,
+  path: string,
+  trackMap: Map<string, Track>,
+  usedTracks: Set<string>,
+): DslIssue[] {
+  const issues: DslIssue[] = [];
+  const checkWindow = (ref: WindowRef | undefined, subPath: string) =>
+    ref ? issues.push(...checkWindowRef(ref, subPath, trackMap, usedTracks)) : undefined;
+
+  const nodeIds = new Map<string, string>(); // id -> first-seen path
+  const targetIds = new Map<string, string>();
+
+  const collect = (child: DslNode, childPath: string) => {
+    if (child.type === "camera") return; // independent registry
+    if (child.type === "diagram") {
+      for (const graphNode of child.graph.nodes) {
+        if (!nodeIds.has(graphNode.id)) nodeIds.set(graphNode.id, childPath);
+      }
+    }
+    if (child.type === "cameraTarget") {
+      if (targetIds.has(child.id)) {
+        issues.push(
+          issue(
+            `${childPath}.id`,
+            "duplicate_camera_target_id",
+            "error",
+            `CameraTarget id "${child.id}" is used more than once inside this camera.`,
+            `give this target a unique id.`,
+          ),
+        );
+      } else if (nodeIds.has(child.id)) {
+        issues.push(
+          issue(
+            `${childPath}.id`,
+            "camera_target_shadows_node",
+            "error",
+            `CameraTarget id "${child.id}" collides with a diagram node id already registered in this camera (at ${nodeIds.get(child.id)}). Node ids and CameraTarget ids share one namespace.`,
+            `rename this target to something that isn't also a node id in a nested diagram.`,
+          ),
+        );
+      }
+      targetIds.set(child.id, childPath);
+      collect(child.child, `${childPath}.child`);
+      return;
+    }
+    for (const [subChild, subPath] of childrenOf(child, childPath)) collect(subChild, subPath);
+  };
+
+  node.children.forEach((child, i) => collect(child, `${path}.children[${i}]`));
+
+  node.shots.forEach((shot, i) => {
+    checkWindow(shot.window, `${path}.shots[${i}].window`);
+    if (shot.focus === "all") return;
+    if ("node" in shot.focus) {
+      if (!nodeIds.has(shot.focus.node)) {
+        issues.push(
+          issue(
+            `${path}.shots[${i}].focus.node`,
+            "unknown_camera_focus",
+            "error",
+            `Shot focuses node "${shot.focus.node}", which isn't a node id in any diagram nested in this camera.`,
+            nodeIds.size > 0
+              ? `use one of: ${quoteList(nodeIds.keys())}, or "all".`
+              : `this camera has no nested diagram — use focus: "all", or a { "target": … } referencing a CameraTarget.`,
+          ),
+        );
+      }
+    } else if (!targetIds.has(shot.focus.target)) {
+      issues.push(
+        issue(
+          `${path}.shots[${i}].focus.target`,
+          "unknown_camera_focus",
+          "error",
+          `Shot focuses target "${shot.focus.target}", which isn't a declared CameraTarget id in this camera.`,
+          targetIds.size > 0
+            ? `use one of: ${quoteList(targetIds.keys())}, or "all".`
+            : `this camera has no CameraTarget — add one, use focus: "all", or a { "node": … } referencing a diagram node.`,
+        ),
+      );
+    }
+  });
+
+  node.children.forEach((child, i) => issues.push(...walkNode(child, `${path}.children[${i}]`, trackMap, usedTracks)));
+
+  return issues;
+}
+
+/** Every direct DslNode child of `node`, tagged with its own path — the
+ * shared iteration validateCamera's collect() uses to recurse without
+ * duplicating a type switch. Intentionally excludes cameraTarget's `child`
+ * (handled directly by the caller, since its id needs to be registered
+ * before recursing) and camera's own children (independent registry). */
+function childrenOf(node: DslNode, path: string): Array<[DslNode, string]> {
+  switch (node.type) {
+    case "stack":
+      return (node.children ?? []).map((child, i) => [child, `${path}.children[${i}]`]);
+    case "card":
+      return node.children.map((child, i) => [child, `${path}.children[${i}]`]);
+    case "switch":
+      return node.cases.map((c, i) => [c.content, `${path}.cases[${i}].content`]);
+    default:
+      return [];
+  }
+}
+
+function validateSwitch(
+  node: Extract<DslNode, { type: "switch" }>,
+  path: string,
+  trackMap: Map<string, Track>,
+  usedTracks: Set<string>,
+): DslIssue[] {
+  const issues: DslIssue[] = [];
+
+  const track = trackMap.get(node.track);
+  if (!track) {
+    issues.push(
+      issue(
+        `${path}.track`,
+        "unknown_track",
+        "error",
+        `Unknown track "${node.track}".`,
+        trackMap.size > 0
+          ? `use one of the declared tracks: ${quoteList(trackMap.keys())}.`
+          : `this scene declares no tracks — add one to scenes[].tracks.`,
+      ),
+    );
+  } else {
+    usedTracks.add(node.track);
+  }
+
+  const maxIndex = track ? track.items.length - 1 : undefined;
+  const ranges: Array<{ lo: number; hi: number; caseIndex: number }> = [];
+
+  node.cases.forEach((caseEntry, caseIndex) => {
+    const [lo, hi] = caseEntry.steps;
+    const casePath = `${path}.cases[${caseIndex}].steps`;
+    if (lo > hi) {
+      issues.push(
+        issue(
+          casePath,
+          "step_index_out_of_range",
+          "error",
+          `Case step range [${lo}, ${hi}] has a start greater than its end.`,
+          `swap the values so the first is <= the second.`,
+        ),
+      );
+    } else if (maxIndex !== undefined && (lo > maxIndex || hi > maxIndex)) {
+      issues.push(
+        issue(
+          casePath,
+          "step_index_out_of_range",
+          "error",
+          `Case step range [${lo}, ${hi}] is out of bounds for track "${node.track}", which has ${track!.items.length} item(s) (valid indices 0-${maxIndex}).`,
+          `use indices within 0-${maxIndex}, or add more items to track "${node.track}".`,
+        ),
+      );
+    } else {
+      ranges.push({ lo, hi, caseIndex });
+    }
+
+    issues.push(...walkNode(caseEntry.content, `${path}.cases[${caseIndex}].content`, trackMap, usedTracks));
+  });
+
+  ranges
+    .slice()
+    .sort((a, b) => a.lo - b.lo)
+    .forEach((range, i, sorted) => {
+      const next = sorted[i + 1];
+      if (!next) return;
+      if (range.hi >= next.lo) {
+        issues.push(
+          issue(
+            `${path}.cases[${next.caseIndex}].steps`,
+            "case_range_overlap",
+            "error",
+            `Case ${next.caseIndex}'s range [${next.lo}, ${next.hi}] overlaps case ${range.caseIndex}'s range [${range.lo}, ${range.hi}].`,
+            `adjust the ranges so each step index is covered by exactly one case.`,
+          ),
+        );
+      } else if (range.hi + 1 < next.lo) {
+        issues.push(
+          issue(
+            `${path}.cases`,
+            "case_range_gap",
+            "warning",
+            `Steps ${range.hi + 1}-${next.lo - 1} of track "${node.track}" aren't covered by any case (between case ${range.caseIndex} and case ${next.caseIndex}).`,
+            `add a case covering those steps, or extend an adjacent case's range.`,
+          ),
+        );
+      }
+    });
+
+  return issues;
+}

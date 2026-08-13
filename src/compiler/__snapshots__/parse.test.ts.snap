@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatIssues > snapshot: a mixed error/warning report 1`] = `
+"motife DSL: 1 error, 1 warning in "TestDoc".
+
+ERROR  scenes[1].content.flows[0].edge
+  Unknown edge "doesNotExist".
+  fix: use an edge id declared in this diagram's graph.edges: "a->b". An edge's id defaults to "<from>-><to>" unless it sets an explicit "id".
+
+WARN   scenes[2].tracks[2]
+  Track "spare" is declared but never referenced by a window, "steps" node, or "switch" node in this scene.
+  fix: reference it (e.g. { "track": "spare", "step": 0 }), or remove the track."
+`;
