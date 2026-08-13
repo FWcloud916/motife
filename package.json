@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
+    "render:dsl": "node scripts/render-dsl.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "verify": "pnpm check && pnpm smoke",
     "upgrade:remotion": "remotion upgrade"

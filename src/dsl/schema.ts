@@ -390,7 +390,12 @@ const switchSchema = z
     type: z.literal("switch"),
     track: z.string().min(1),
     mode: z.enum(["latch", "switch"]).optional(),
-    grow: z.boolean().optional(),
+    // No `grow` here, deliberately: StepSwitch (src/components/StepReveal/
+    // StepSwitch.tsx) renders its matched case through a transparent
+    // Fragment — there's no element of its own for a grow flag to attach
+    // to. A case that needs to fill remaining space sets `grow` on its own
+    // `content` node instead (see docs/dsl-schema.md's Walkthrough example,
+    // case [3,3]'s Stack).
     cases: z.array(switchCaseSchema).min(1),
   })
   .strict();

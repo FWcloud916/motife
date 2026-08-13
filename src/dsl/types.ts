@@ -234,7 +234,6 @@ export interface SwitchNode {
   type: "switch";
   track: string;
   mode?: "latch" | "switch";
-  grow?: boolean;
   cases: SwitchCaseDsl[];
 }
 
