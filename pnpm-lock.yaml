@@ -20,6 +20,9 @@ importers:
       '@remotion/paths':
         specifier: 4.0.508
         version: 4.0.508
+      '@remotion/transitions':
+        specifier: 4.0.508
+        version: 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -525,6 +528,12 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
+  '@remotion/shapes@4.0.508':
+    resolution: {integrity: sha512-7jzH+GHPTa0n6btT4yvXhpKW/VbQnJVm2NOjRYyjX5d2TaPwb2R8dpSdqGzusL4T8bP3v5q3yvXOLfHDBQATJw==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   '@remotion/streaming@4.0.508':
     resolution: {integrity: sha512-0RGjgFXkOwBAgPl/z4fO5eTWIMlWfbUFV747TETUpjSO2z6wSTpTJr6WGn9tOSi6OSjdtsqXcBEUpt1XvMuMhA==}
 
@@ -548,6 +557,12 @@ packages:
 
   '@remotion/timeline-utils@4.0.508':
     resolution: {integrity: sha512-AF3Nwyse5xmb51kRwpqGDhCW02KsHCjjwwIuJ7dcVm3s7H9G8uAxyC7shxvzvxzvxFl/Z168cf4Tlfh1FdBrwA==}
+
+  '@remotion/transitions@4.0.508':
+    resolution: {integrity: sha512-erMbuTDUu4mQn/paGYUGZq5tkgS/Flc4DkhaIcoYU9ELSsaVn8Wgz/YvbFAkUAbm9bablHocr+9reoqCzW8S3g==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@remotion/web-renderer@4.0.508':
     resolution: {integrity: sha512-knl+/1s7C5ZYnm9kL51Bphs+iqMRv3LQzw2uoMRSlDWR0FGBUNceDMxozyuBnS53mIiDE3zUpKweI+AJtSy+Lw==}
@@ -2612,6 +2627,13 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  '@remotion/shapes@4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@remotion/paths': 4.0.508
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      remotion: 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+
   '@remotion/streaming@4.0.508': {}
 
   '@remotion/studio-codemods@4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
@@ -2704,6 +2726,14 @@ snapshots:
   '@remotion/timeline-utils@4.0.508':
     dependencies:
       mediabunny: 1.50.8
+
+  '@remotion/transitions@4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      '@remotion/paths': 4.0.508
+      '@remotion/shapes': 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+      remotion: 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
 
   '@remotion/web-renderer@4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
