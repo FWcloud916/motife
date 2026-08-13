@@ -8,12 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@dagrejs/dagre':
+        specifier: ^3.1.1
+        version: 3.1.1
       '@remotion/cli':
         specifier: 4.0.508
         version: 4.0.508(postcss@8.5.26)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       '@remotion/google-fonts':
         specifier: 4.0.508
         version: 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@remotion/paths':
+        specifier: 4.0.508
+        version: 4.0.508
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -129,6 +135,12 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@dagrejs/dagre@3.1.1':
+    resolution: {integrity: sha512-zroZB1dFOFiGgv4Xcrn1DckB1o4aOikPqD2NDQPV0WM//CXGcS6xiD0rNkqHmw6FEg4tabt4nxPLwgCWT+Vb2A==}
+
+  '@dagrejs/graphlib@4.0.5':
+    resolution: {integrity: sha512-7xrBTqIts3o+PMUZX97wSc+7TUbW+/rULzGNCTP6yooNVDXbzw4Wutg/H/xOutTB/c/k0YqOAavgPh4/Zk9PFA==}
 
   '@emnapi/core@1.11.3':
     resolution: {integrity: sha512-zLpS5asjEb7lq8jYLq37N6XKaE41DIexlY1rF/z4/tIl3wo13Sqm28fRyfIsKZD+NZ8mM5RoKkpW/rBcuoSZSg==}
@@ -497,6 +509,9 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
+
+  '@remotion/paths@4.0.508':
+    resolution: {integrity: sha512-awyvcxTqpZWjJhmB9em8Kq2zsq3c89JfZM8rBNfvOLX/X+NAL8Jeyd9rXUm+zuAfpNe/8YbikROgKX81nyxMmA==}
 
   '@remotion/player@4.0.508':
     resolution: {integrity: sha512-1PRmoz39abpF3Br9FPSpJrCb7X+/JpYHr66AzE+qNsiRQ5HssRqgUwVvF/F1zLKgjmT+NQlJDADbCGswcO/K2A==}
@@ -2203,6 +2218,12 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@dagrejs/dagre@3.1.1':
+    dependencies:
+      '@dagrejs/graphlib': 4.0.5
+
+  '@dagrejs/graphlib@4.0.5': {}
+
   '@emnapi/core@1.11.3':
     dependencies:
       '@emnapi/wasi-threads': 1.2.3
@@ -2560,6 +2581,8 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
       remotion: 4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+
+  '@remotion/paths@4.0.508': {}
 
   '@remotion/player@4.0.508(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
