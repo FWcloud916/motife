@@ -1,6 +1,6 @@
 import { AbsoluteFill } from "remotion";
-import { TransitionSeries } from "@remotion/transitions";
 import { tokens } from "../../../components";
+import { SceneSeries } from "../SceneSeries";
 import { TIMELINE } from "./storyboard";
 import { SCENE_COMPONENTS } from "./sceneRegistry";
 
@@ -12,25 +12,18 @@ import { SCENE_COMPONENTS } from "./sceneRegistry";
  * Built entirely from src/components/ (Phase 1's component library) —
  * this is what replaced the Phase 0 hand-built scenes once the library
  * proved it could reproduce the baseline at equal or better quality
- * (motife-plan.md milestone M1). Uses TransitionSeries with no
- * <TransitionSeries.Transition> between scenes, which is timing-
- * equivalent to a plain <Sequence> zip (hard cuts, no frames borrowed from
- * either neighbor). A per-boundary `transition: "fade"` option can be
- * added to storyboard.ts later — introducing a fade shortens TOTAL_FRAMES
- * (adjacent scenes overlap), and that math isn't threaded through
- * buildTimeline() yet.
+ * (motife-plan.md milestone M1).
+ *
+ * Every boundary in storyboard.ts is a hard cut, so <SceneSeries> emits no
+ * transitions here and the timing is identical to a plain <Sequence> zip.
+ * That is a content decision, not a missing capability: the eval-set
+ * regression policy compares this video against the Phase 0 baseline, and
+ * a fade would shift every subsequent frame. Setting `transitionToNext:
+ * "fade"` on a scene is all it takes — buildTimeline() already accounts
+ * for the overlap in TOTAL_FRAMES.
  */
 export const JwtAuthFlow: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: tokens.color.bg }}>
-    <TransitionSeries>
-      {TIMELINE.map(({ id, durationInFrames }) => {
-        const SceneComponent = SCENE_COMPONENTS[id];
-        return (
-          <TransitionSeries.Sequence key={id} name={id} durationInFrames={durationInFrames}>
-            <SceneComponent durationInFrames={durationInFrames} />
-          </TransitionSeries.Sequence>
-        );
-      })}
-    </TransitionSeries>
+    <SceneSeries timeline={TIMELINE} components={SCENE_COMPONENTS} />
   </AbsoluteFill>
 );

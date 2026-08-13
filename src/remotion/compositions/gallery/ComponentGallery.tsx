@@ -6,7 +6,7 @@
 // baseline barely uses them (docs/primitive-inventory.md: 0 uses each at
 // Phase 0 exit).
 import type { FC } from "react";
-import { AbsoluteFill, Sequence } from "remotion";
+import { AbsoluteFill } from "remotion";
 import {
   Camera,
   CodeBlock,
@@ -15,14 +15,29 @@ import {
   Terminal,
 } from "../../../components";
 import type { GraphSpec } from "../../../components";
+import { SceneSeries } from "../SceneSeries";
+import type { SceneComponentProps } from "../SceneSeries";
+import { buildTimeline, totalFrames } from "../timeline";
 import { FPS } from "../jwt-auth/storyboard";
 
-const DIAGRAM_FRAMES = 5 * FPS;
-const CODE_FRAMES = 5 * FPS;
-const TERMINAL_FRAMES = 5 * FPS;
-const CAMERA_FRAMES = 6 * FPS;
+// The gallery is also where a non-cut transition is actually rendered:
+// the eval-set videos all use hard cuts (regression policy), so without a
+// fade here the transition path would ship untested. `pnpm smoke` samples
+// this composition every run.
+const GALLERY_SCENES = [
+  { id: "diagram", durationInSeconds: 5, transitionToNext: "fade" as const },
+  { id: "code", durationInSeconds: 5 },
+  { id: "terminal", durationInSeconds: 5 },
+  { id: "camera", durationInSeconds: 6 },
+] as const;
 
-export const GALLERY_TOTAL_FRAMES = DIAGRAM_FRAMES + CODE_FRAMES + TERMINAL_FRAMES + CAMERA_FRAMES;
+type GallerySceneId = (typeof GALLERY_SCENES)[number]["id"];
+
+const GALLERY_TIMELINE = buildTimeline(GALLERY_SCENES, FPS);
+
+/** 615, not 630: the one fade boundary overlaps its two neighbours by
+ * TRANSITION_FRAMES, and buildTimeline accounts for it. */
+export const GALLERY_TOTAL_FRAMES = totalFrames(GALLERY_TIMELINE);
 
 const DEMO_GRAPH: GraphSpec = {
   direction: "right",
@@ -37,9 +52,9 @@ const DEMO_GRAPH: GraphSpec = {
   ],
 };
 
-const DiagramDemo: FC = () => (
+const DiagramDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={DIAGRAM_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "primary" }}
     header={{ eyebrow: "Component Gallery", title: "Diagram + FlowPulse" }}
   >
@@ -67,9 +82,9 @@ const CODE_LINES = [
   { segments: ["}"] },
 ];
 
-const CodeBlockDemo: FC = () => (
+const CodeBlockDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={CODE_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "info" }}
     header={{ eyebrow: "Component Gallery", title: "CodeBlock" }}
   >
@@ -86,9 +101,9 @@ const CodeBlockDemo: FC = () => (
   </Scene>
 );
 
-const TerminalDemo: FC = () => (
+const TerminalDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={TERMINAL_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "success" }}
     header={{ eyebrow: "Component Gallery", title: "Terminal" }}
   >
@@ -114,9 +129,9 @@ const TerminalDemo: FC = () => (
   </Scene>
 );
 
-const CameraDemo: FC = () => (
+const CameraDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
   <Scene
-    durationInFrames={CAMERA_FRAMES}
+    durationInFrames={durationInFrames}
     background={{ variant: "grid", glow: "warning" }}
     header={{ eyebrow: "Component Gallery", title: "Camera" }}
   >
@@ -138,22 +153,15 @@ const CameraDemo: FC = () => (
   </Scene>
 );
 
+const GALLERY_COMPONENTS: Record<GallerySceneId, FC<SceneComponentProps>> = {
+  diagram: DiagramDemo,
+  code: CodeBlockDemo,
+  terminal: TerminalDemo,
+  camera: CameraDemo,
+};
+
 export const ComponentGallery: FC = () => (
   <AbsoluteFill>
-    <Sequence durationInFrames={DIAGRAM_FRAMES}>
-      <DiagramDemo />
-    </Sequence>
-    <Sequence from={DIAGRAM_FRAMES} durationInFrames={CODE_FRAMES}>
-      <CodeBlockDemo />
-    </Sequence>
-    <Sequence from={DIAGRAM_FRAMES + CODE_FRAMES} durationInFrames={TERMINAL_FRAMES}>
-      <TerminalDemo />
-    </Sequence>
-    <Sequence
-      from={DIAGRAM_FRAMES + CODE_FRAMES + TERMINAL_FRAMES}
-      durationInFrames={CAMERA_FRAMES}
-    >
-      <CameraDemo />
-    </Sequence>
+    <SceneSeries timeline={GALLERY_TIMELINE} components={GALLERY_COMPONENTS} />
   </AbsoluteFill>
 );
