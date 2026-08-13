@@ -8,7 +8,9 @@
 import type { FC } from "react";
 import { AbsoluteFill } from "remotion";
 import {
+  Callout,
   Camera,
+  CameraTarget,
   CodeBlock,
   Diagram,
   Scene,
@@ -142,9 +144,13 @@ const CameraDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
     <Camera
       shots={[
         { window: { from: 0, to: 0.01 }, focus: "all", zoom: "wide" },
-        { window: { from: 0.15, to: 0.4 }, focus: { node: "client" }, zoom: "close" },
-        { window: { from: 0.5, to: 0.75 }, focus: { node: "worker" }, zoom: "close" },
-        { window: { from: 0.85, to: 1 }, focus: "all", zoom: "wide" },
+        { window: { from: 0.12, to: 0.32 }, focus: { node: "client" }, zoom: "close" },
+        { window: { from: 0.42, to: 0.62 }, focus: { node: "worker" }, zoom: "close" },
+        // Ends on the CameraTarget rather than a wide shot, on purpose:
+        // smoke samples the final frame of every composition, so a
+        // regression in CameraTarget's measurement shows up as a
+        // mis-framed still instead of passing unnoticed.
+        { window: { from: 0.75, to: 0.92 }, focus: { target: "camera-note" }, zoom: "medium" },
       ]}
     >
       {/* No centering/sizing wrapper here on purpose — a Diagram nested in
@@ -153,6 +159,19 @@ const CameraDemo: FC<SceneComponentProps> = ({ durationInFrames }) => (
           space. Any offsetting wrapper in between would desync the two;
           Camera's own shots (not CSS) are what frame the content. */}
       <Diagram graph={DEMO_GRAPH} reveal={{ window: { from: 0, to: 0.05 } }} />
+      {/* Direct child of Camera's content, no positioned wrapper between —
+          CameraTarget measures offsetLeft/offsetTop, so an intervening
+          offset parent would desync the registered rect from where this
+          actually renders. */}
+      <CameraTarget id="camera-note">
+        <Callout
+          variant="banner"
+          tone="warning"
+          icon="document"
+          text="CameraTarget"
+          detail="focus by id, measured after fonts settle"
+        />
+      </CameraTarget>
     </Camera>
   </Scene>
 );
