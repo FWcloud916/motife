@@ -5,6 +5,7 @@
 // reaches this component after src/compiler/parse.ts's parseDocument(),
 // never constructed or cast directly (see parse.ts's file header).
 import type { FC } from "react";
+import { useMemo } from "react";
 import { AbsoluteFill } from "remotion";
 import { SceneSeries } from "../../remotion/compositions/SceneSeries";
 import type { SceneComponentProps } from "../../remotion/compositions/SceneSeries";
@@ -22,20 +23,28 @@ export interface DslVideoProps {
 }
 
 export const DslVideo: FC<DslVideoProps> = ({ doc }) => {
-  const timeline = dslTimeline(doc);
-
-  // One small wrapper component per scene, closing over that scene's own
-  // data — SceneSeries only ever calls it with {durationInFrames}, the
-  // same SceneComponentProps contract every hand-written scene component
-  // satisfies.
-  const components: Record<string, FC<SceneComponentProps>> = {};
-  for (const scene of doc.scenes) {
-    const ScenePlayer: FC<SceneComponentProps> = ({ durationInFrames }) => (
-      <DslSceneView scene={scene} durationInFrames={durationInFrames} />
-    );
-    ScenePlayer.displayName = `DslScene(${scene.id})`;
-    components[scene.id] = ScenePlayer;
-  }
+  // Memoized on `doc`, and that matters beyond saving a loop: Remotion
+  // re-renders this component once per frame, and the per-scene wrapper
+  // components below are React component TYPES. Recreating them each
+  // render gives React a different function identity per frame, which
+  // unmounts and remounts the whole scene subtree every frame — replaying
+  // every mount effect, including Diagram's fonts-gated node measurement
+  // and its delayRender handle, once per frame instead of once per scene.
+  const { timeline, components } = useMemo(() => {
+    // One small wrapper component per scene, closing over that scene's own
+    // data — SceneSeries only ever calls it with {durationInFrames}, the
+    // same SceneComponentProps contract every hand-written scene component
+    // satisfies.
+    const sceneComponents: Record<string, FC<SceneComponentProps>> = {};
+    for (const scene of doc.scenes) {
+      const ScenePlayer: FC<SceneComponentProps> = ({ durationInFrames }) => (
+        <DslSceneView scene={scene} durationInFrames={durationInFrames} />
+      );
+      ScenePlayer.displayName = `DslScene(${scene.id})`;
+      sceneComponents[scene.id] = ScenePlayer;
+    }
+    return { timeline: dslTimeline(doc), components: sceneComponents };
+  }, [doc]);
 
   return (
     <AbsoluteFill>

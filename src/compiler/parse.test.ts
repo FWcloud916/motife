@@ -371,6 +371,72 @@ const CASES: ErrorCase[] = [
     messageContains: ["chars/sec"],
     fixContains: ["durationInSeconds"],
   },
+  {
+    name: "narration is far slower than a comfortable pace for its duration",
+    code: "narration_pacing",
+    severity: "warning",
+    mutate: (doc) => {
+      doc.scenes[0].narration = "Hi.";
+    },
+    pathIs: "scenes[0].narration",
+    messageContains: ["chars/sec", "slower"],
+    fixContains: ["durationInSeconds"],
+  },
+  {
+    name: "a switch case's step range starts after it ends",
+    code: "step_index_out_of_range",
+    severity: "error",
+    mutate: (doc) => {
+      doc.scenes[2].content.children[2].cases[1].steps = [1, 0];
+    },
+    pathIs: "scenes[2].content.children[2].cases[1].steps",
+    messageContains: ["[1, 0]"],
+    fixContains: ["swap"],
+  },
+  {
+    name: "a switch case's step range exceeds the track's item count",
+    code: "step_index_out_of_range",
+    severity: "error",
+    mutate: (doc) => {
+      doc.scenes[2].content.children[2].cases[1].steps = [1, 5];
+    },
+    pathIs: "scenes[2].content.children[2].cases[1].steps",
+    messageContains: ["[1, 5]", '"checks"'],
+    fixContains: ["0-1"],
+  },
+  {
+    name: "a switch's first case starts past step 0 (leading gap)",
+    code: "case_range_gap",
+    severity: "warning",
+    mutate: (doc) => {
+      doc.scenes[2].content.children[2].cases.shift();
+    },
+    pathIs: "scenes[2].content.children[2].cases",
+    messageContains: ["Steps 0-0"],
+    fixContains: ["down to 0"],
+  },
+  {
+    name: "a track's own absolute window is inverted",
+    code: "window_order",
+    severity: "error",
+    mutate: (doc) => {
+      doc.scenes[2].tracks[0].window = { from: 0.9, to: 0.1 };
+    },
+    pathIs: "scenes[2].tracks[0].window",
+    messageContains: ["0.9", "0.1"],
+    fixContains: ["from < to"],
+  },
+  {
+    name: "a track's own window has a step index out of range",
+    code: "step_index_out_of_range",
+    severity: "error",
+    mutate: (doc) => {
+      doc.scenes[2].tracks[1].window = { track: "checks", step: 7 };
+    },
+    pathIs: "scenes[2].tracks[1].window",
+    messageContains: ["7", "checks"],
+    fixContains: ["0 and 1"],
+  },
 ];
 
 describe("parseDocument — error/warning contract", () => {

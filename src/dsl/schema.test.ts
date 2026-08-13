@@ -93,6 +93,14 @@ describe("dslDocumentSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects an empty-string caption — 'no caption' must be said as null", () => {
+    const doc = structuredClone(MINIMAL_DOC) as { scenes: Array<{ caption?: string | null }> };
+    doc.scenes[0].caption = "";
+    expect(dslDocumentSchema.safeParse(doc).success).toBe(false);
+    doc.scenes[0].caption = null;
+    expect(dslDocumentSchema.safeParse(doc).success).toBe(true);
+  });
+
   it("rejects an unknown node type", () => {
     const result = dslNodeSchema.safeParse({ type: "not-a-real-node" });
     expect(result.success).toBe(false);

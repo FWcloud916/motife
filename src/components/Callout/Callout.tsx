@@ -141,6 +141,10 @@ export const Callout: FC<CalloutProps> = (props) => {
         justifyContent: "center",
         gap: tokens.spacing.sm,
         width: props.width ? MEASURE_WIDTH[props.width] : undefined,
+        // A Measure width must MEAN that fraction of the row — without
+        // border-box the padding lands on top of the percentage and the
+        // card overflows its share (Terminal/CodeBlock already do this).
+        boxSizing: "border-box",
         // Main-axis grow only — NOT also a forced height:100%. A card is
         // always a Stack's flex child, never handed directly to a
         // non-flex parent the way a root Stack can be, so it doesn't need

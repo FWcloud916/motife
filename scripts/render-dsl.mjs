@@ -35,7 +35,16 @@ async function main() {
     process.exit(1);
   }
 
-  const raw = JSON.parse(await fs.readFile(docPath, "utf8"));
+  let raw;
+  try {
+    raw = JSON.parse(await fs.readFile(docPath, "utf8"));
+  } catch (cause) {
+    // A raw ENOENT/SyntaxError doesn't name the input file — this is a
+    // CLI whose whole job is "point at a JSON file", so the error should
+    // say which one, in the same readable register as the validation
+    // errors calculateMetadata produces.
+    throw new Error(`cannot read DSL document "${docPath}": ${cause.message}`, { cause });
+  }
 
   await ensureBrowser();
 
@@ -57,6 +66,12 @@ async function main() {
     composition,
     serveUrl,
     codec: "h264",
+    // Explicit, not left to renderMedia's default (which happens to also
+    // be jpeg today): remotion.config.ts sets setVideoImageFormat("jpeg")
+    // for the CLI, and CLAUDE.md's rule is that programmatic renders state
+    // the equivalent option as a call argument rather than trusting the
+    // two to coincide.
+    imageFormat: "jpeg",
     outputLocation: outPath,
     inputProps,
     overwrite: true,

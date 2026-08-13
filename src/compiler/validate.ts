@@ -225,10 +225,10 @@ function validateScene(scene: DslScene, sceneIndex: number): DslIssue[] {
 
   issues.push(...checkNarrationPacing(scene, sceneIndex));
 
-  const { trackIssues, trackMap } = validateTracks(scene, sceneIndex);
+  const usedTracks = new Set<string>();
+  const { trackIssues, trackMap } = validateTracks(scene, sceneIndex, usedTracks);
   issues.push(...trackIssues);
 
-  const usedTracks = new Set<string>();
   issues.push(
     ...walkNode(scene.content, `${scenePath}.content`, trackMap, usedTracks),
   );
@@ -253,6 +253,7 @@ function validateScene(scene: DslScene, sceneIndex: number): DslIssue[] {
 function validateTracks(
   scene: DslScene,
   sceneIndex: number,
+  usedTracks: Set<string>,
 ): { trackIssues: DslIssue[]; trackMap: Map<string, Track> } {
   const issues: DslIssue[] = [];
   const declaredSoFar = new Map<string, Track>();
@@ -293,7 +294,21 @@ function validateTracks(
             `move "${refId}" earlier in the tracks array (a track may only reference an earlier-declared track), or use an absolute {"from": …, "to": …} window.`,
           ),
         );
+      } else {
+        // The reference is well-formed (declared earlier, not itself) —
+        // now check what it points AT: a bad step index in a track's own
+        // window would otherwise surface only as a render-time throw from
+        // resolveWindowRef. checkWindowRef against only the
+        // earlier-declared tracks also records the reference in
+        // usedTracks, so a track consumed solely by another track's
+        // window isn't misreported as unused.
+        issues.push(...checkWindowRef(track.window, `${path}.window`, declaredSoFar, usedTracks));
       }
+    } else {
+      // A track's absolute window gets the same from < to check every
+      // node-level WindowRef gets — an inverted track window would
+      // otherwise silently produce inverted step spans at render time.
+      issues.push(...checkWindowRef(track.window, `${path}.window`, declaredSoFar, usedTracks));
     }
 
     declaredSoFar.set(track.id, track);
@@ -774,34 +789,62 @@ function validateSwitch(
     issues.push(...walkNode(caseEntry.content, `${path}.cases[${caseIndex}].content`, trackMap, usedTracks));
   });
 
-  ranges
-    .slice()
-    .sort((a, b) => a.lo - b.lo)
-    .forEach((range, i, sorted) => {
-      const next = sorted[i + 1];
-      if (!next) return;
-      if (range.hi >= next.lo) {
-        issues.push(
-          issue(
-            `${path}.cases[${next.caseIndex}].steps`,
-            "case_range_overlap",
-            "error",
-            `Case ${next.caseIndex}'s range [${next.lo}, ${next.hi}] overlaps case ${range.caseIndex}'s range [${range.lo}, ${range.hi}].`,
-            `adjust the ranges so each step index is covered by exactly one case.`,
-          ),
-        );
-      } else if (range.hi + 1 < next.lo) {
-        issues.push(
-          issue(
-            `${path}.cases`,
-            "case_range_gap",
-            "warning",
-            `Steps ${range.hi + 1}-${next.lo - 1} of track "${node.track}" aren't covered by any case (between case ${range.caseIndex} and case ${next.caseIndex}).`,
-            `add a case covering those steps, or extend an adjacent case's range.`,
-          ),
-        );
-      }
-    });
+  const sorted = ranges.slice().sort((a, b) => a.lo - b.lo);
+  sorted.forEach((range, i) => {
+    const next = sorted[i + 1];
+    if (!next) return;
+    if (range.hi >= next.lo) {
+      issues.push(
+        issue(
+          `${path}.cases[${next.caseIndex}].steps`,
+          "case_range_overlap",
+          "error",
+          `Case ${next.caseIndex}'s range [${next.lo}, ${next.hi}] overlaps case ${range.caseIndex}'s range [${range.lo}, ${range.hi}].`,
+          `adjust the ranges so each step index is covered by exactly one case.`,
+        ),
+      );
+    } else if (range.hi + 1 < next.lo) {
+      issues.push(
+        issue(
+          `${path}.cases`,
+          "case_range_gap",
+          "warning",
+          `Steps ${range.hi + 1}-${next.lo - 1} of track "${node.track}" aren't covered by any case (between case ${range.caseIndex} and case ${next.caseIndex}).`,
+          `add a case covering those steps, or extend an adjacent case's range.`,
+        ),
+      );
+    }
+  });
+
+  // Uncovered steps at the boundaries — checking only adjacent pairs above
+  // would let a switch whose first case starts past 0, or whose last case
+  // stops short of the track's final step, pass silently.
+  if (sorted.length > 0) {
+    const first = sorted[0];
+    if (first.lo > 0) {
+      issues.push(
+        issue(
+          `${path}.cases`,
+          "case_range_gap",
+          "warning",
+          `Steps 0-${first.lo - 1} of track "${node.track}" aren't covered by any case (before case ${first.caseIndex}).`,
+          `add a case covering those steps, or extend case ${first.caseIndex}'s range down to 0.`,
+        ),
+      );
+    }
+    const last = sorted[sorted.length - 1];
+    if (maxIndex !== undefined && last.hi < maxIndex) {
+      issues.push(
+        issue(
+          `${path}.cases`,
+          "case_range_gap",
+          "warning",
+          `Steps ${last.hi + 1}-${maxIndex} of track "${node.track}" aren't covered by any case (after case ${last.caseIndex}).`,
+          `add a case covering those steps, or extend case ${last.caseIndex}'s range up to ${maxIndex}.`,
+        ),
+      );
+    }
+  }
 
   return issues;
 }

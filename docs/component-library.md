@@ -11,8 +11,9 @@
 > DSL over them — see `docs/primitive-inventory.md`'s "Phase 2 outcome"
 > section for why. Every prop shape below doubles as the DSL schema's
 > vocabulary: `src/dsl/schema.ts` emits these props verbatim from JSON, so
-> every field here is JSON-serializable except `children` (composition
-> slots only, never data) — see **[docs/dsl-schema.md](dsl-schema.md)** for
+> every field here is JSON-serializable except the ReactNode slots —
+> `children`, and `StepSwitch`'s `cases[].content` (composition slots
+> only, never data) — see **[docs/dsl-schema.md](dsl-schema.md)** for
 > the DSL's own document-level reference (envelope, scenes, tracks,
 > `WindowRef`, validation). Verify field names/shapes against
 > `src/components/index.ts` (the actual barrel) before treating this as

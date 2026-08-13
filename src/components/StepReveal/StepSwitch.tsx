@@ -54,5 +54,20 @@ export const StepSwitch: FC<StepSwitchProps> = ({ stepWindows: windows, cases, m
   if (activeIndex === -1) return null;
 
   const match = cases.find(({ steps: [lo, hi] }) => activeIndex >= lo && activeIndex <= hi);
-  return match ? <>{match.content}</> : null;
+  if (match) return <>{match.content}</>;
+
+  // No case covers the active step. In latch mode, hold the nearest case
+  // that already started (greatest `lo` <= activeIndex) instead of
+  // blanking — "stays shown until the next case's steps begin" must hold
+  // across a coverage gap too, which validation only warns about (a
+  // gapped switch is legal, just suspicious). Switch mode keeps its
+  // strict nothing-between-cases semantics.
+  if (mode === "latch") {
+    const started = cases.filter(({ steps: [lo] }) => lo <= activeIndex);
+    if (started.length > 0) {
+      const held = started.reduce((a, b) => (b.steps[0] > a.steps[0] ? b : a));
+      return <>{held.content}</>;
+    }
+  }
+  return null;
 };

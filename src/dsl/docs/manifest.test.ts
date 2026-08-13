@@ -31,10 +31,10 @@ describe("RAW_DOCS", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("every doc's beats are in intro -> breakdown -> walkthrough -> summary order", () => {
-    // validateDocument (run inside parseDocumentOrThrow above) already
-    // enforces this per-document; this test asserts the manifest actually
-    // contains the pin table's entries, so a doc silently dropped from
+  it("every doc has a FRAME_PINS entry, and the pin table has no orphans", () => {
+    // Beat ordering itself is enforced per-document by validateDocument
+    // (run inside parseDocumentOrThrow above); what THIS test pins is the
+    // manifest<->pin-table correspondence, so a doc silently dropped from
     // RAW_DOCS without updating FRAME_PINS fails loudly here instead.
     for (const doc of docs) {
       expect(FRAME_PINS[doc.id], `no FRAME_PINS entry for doc id "${doc.id}"`).toBeDefined();
@@ -44,6 +44,10 @@ describe("RAW_DOCS", () => {
 
   it.each(docs.map((doc) => [doc.id, doc] as const))("%s: frame count and scene offsets are pinned", (id, doc) => {
     const pin = FRAME_PINS[id];
+    // Re-asserted here (not just in the coverage test above) so a missing
+    // pin fails this parameterized case with a named message instead of a
+    // bare TypeError on `pin.total` — test order isn't a safety guarantee.
+    expect(pin, `no FRAME_PINS entry for doc id "${id}"`).toBeDefined();
     const timeline = dslTimeline(doc);
     expect(dslTotalFrames(doc)).toBe(pin.total);
     expect(timeline.map((entry) => entry.from)).toEqual(pin.from);

@@ -20,16 +20,16 @@ import { FPS, WIDTH, HEIGHT } from "./compositions/videoDefaults";
 // Deliberately a LITERAL durationInFrames per doc (via dslTimeline, not
 // calculateMetadata): scripts/smoke.mjs's correctness must not depend on
 // whether getCompositions() evaluates calculateMetadata in this Remotion
-// version — DslPreview above is the one composition that needs dynamic
-// sizing (an ad-hoc doc has no baseline to pin), every registered baseline
-// here does not.
+// version — DslPreview (registered last, below) is the one composition
+// that needs dynamic sizing (an ad-hoc doc has no baseline to pin), every
+// registered baseline here does not.
 const DSL_DOCS = RAW_DOCS.map((raw) => parseDocumentOrThrow(raw));
 
 // A tiny, permanently-valid document — the default DslPreview shows on
-// first Studio load, and what scripts/render-dsl.mjs's --props override
-// replaces via calculateMetadata below. Parsed (not just typed) at module
-// scope so a regression here fails the bundle immediately, the same
-// loud-failure discipline Stage 4's real baselines will follow.
+// first Studio load, and what scripts/render-dsl.mjs replaces by passing
+// its own `inputProps` (re-validated by calculateMetadata below). Parsed
+// (not just typed) at module scope so a regression here fails the bundle
+// immediately — the same loud-failure discipline DSL_DOCS above uses.
 const BLANK_DOC = parseDocumentOrThrow(
   {
     version: 1,
@@ -61,7 +61,7 @@ const BLANK_DOC = parseDocumentOrThrow(
         id: "summary",
         beat: "summary",
         durationInSeconds: 2,
-        narration: "Pass --props to render a real document.",
+        narration: "Render a real document via pnpm render:dsl.",
         content: { type: "pill", text: "summary" },
       },
     ],
@@ -123,13 +123,13 @@ export const RemotionRoot: React.FC = () => (
         acceptance): `pnpm render:dsl <doc>.json out.mp4` renders ANY valid
         DSL document through this one composition — nothing here is
         specific to a particular video. calculateMetadata re-validates
-        whatever `--props` supplies (BLANK_DOC's shape only fixes the
-        Studio's own default preview) and derives duration/fps/size from
-        it, rather than trusting the literal defaultProps below past first
-        load. Stage 4 registers the real eval-set baselines as their own
-        named compositions, each with a module-scope literal
-        durationInFrames — this one stays dynamic on purpose, since ad-hoc
-        docs don't have a baseline to pin. */}
+        whatever inputProps the caller supplies (BLANK_DOC's shape only
+        fixes the Studio's own default preview) and derives
+        duration/fps/size from it, rather than trusting the literal
+        defaultProps below past first load. The real eval-set baselines
+        are registered above as their own named compositions, each with a
+        module-scope literal durationInFrames — this one stays dynamic on
+        purpose, since ad-hoc docs don't have a baseline to pin. */}
     <Composition
       id="DslPreview"
       component={DslVideo}

@@ -438,8 +438,11 @@ export const sceneSchema = z
     durationInSeconds: z.number().positive(),
     narration: z.string().min(1),
     /** Omit to fall back to `narration`; explicit `null` renders no
-     * caption at all (Summary's original scene never had one). */
-    caption: z.string().nullable().optional(),
+     * caption at all (Summary's original scene never had one). min(1)
+     * keeps `""` out of the ambiguous middle — an empty string would
+     * silently behave like `null`, and "no caption" should be said as
+     * `null`, not smuggled in as empty text. */
+    caption: z.string().min(1).nullable().optional(),
     transitionToNext: sceneTransitionSchema.optional(),
     background: z
       .object({
