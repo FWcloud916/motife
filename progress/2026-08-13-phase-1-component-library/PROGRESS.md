@@ -1,7 +1,7 @@
 # Phase 1 — 解說元件庫 (Explainer Component Library)
 
 **Slug:** phase-1-component-library
-**Status:** review
+**Status:** done
 **Ticket:** N/A
 **Related plan:** [phase-1-component-library-plan-next-phase-generic-penguin.md](../_plans/phase-1-component-library-plan-next-phase-generic-penguin.md)
 **Created:** 2026-08-13
@@ -70,11 +70,12 @@ Full design detail in the linked plan snapshot.
 - PR 4 (swap-and-cleanup) complete on branch phase-1/swap-and-cleanup (stacked on PR 3): swapped scenes-v2/ into place as scenes/, sceneRegistryV2.tsx/JwtAuthFlowV2.tsx renamed to replace the originals (composition id stays 'JwtAuthFlow' -- the stable public handle pnpm render/still/smoke all address). Deleted the Phase 0 primitives: visuals.tsx, src/remotion/theme.ts (the deprecated shim), and the old scenes/*.tsx. Root.tsx now registers only 2 compositions (JwtAuthFlow, ComponentGallery) -- no more V2 duplicate. Updated docs/primitive-inventory.md (Phase 1 outcome section, v2 stills linked) and docs/project-overview.md (directory tree, Phase 0/1 narrative) with Last-updated bumps; added docs/component-library.md as the Phase 1 public API reference / Phase 2 DSL schema draft. Skipped the optional ESLint import-restriction hardening (fragile to encode correctly across varying relative-import depths; noted as a follow-up rather than risking a broken lint config). pnpm verify green end-to-end; pnpm still confirmed the swapped composition renders correctly through the real Remotion CLI, not just the smoke script.
 - Opened PR #5 (https://github.com/FWcloud916/motife/pull/5) for phase-1/swap-and-cleanup, stacked on/targeting phase-1/jwt-rebuild (#4). All 4 Phase 1 PRs are now open, stacked in order (#2 tokens-and-foundation -> #3 diagram-flow-code -> #4 jwt-rebuild -> #5 swap-and-cleanup), each individually pnpm-verify-green. Merge order: #2, #3, #4, #5 into main. Transitioning item to review pending merge.
 - PR #2 (tokens-and-foundation) and PR #3 (diagram-flow-code) merged into main as merge commits 4bf04ee and cc19396. PR #4 retargeted from phase-1/diagram-flow-code to main and is still MERGEABLE/CLEAN; PR #5 continues to target phase-1/jwt-rebuild. Verified the merged main directly (detached checkout of origin/main + frozen-lockfile install): pnpm verify fully green — typecheck, lint, 30 tests, and smoke render of both JwtAuthFlow and ComponentGallery. Remaining to merge: #4 then #5.
+- Closed item as `done`.
 
 ## Outcome
 
-> Fill in after development finishes.
+Phase 1 complete (motife-plan.md milestone M1). All 8 planned components built under src/components/ with a design-token system; JwtAuthFlow rebuilt entirely from the library and swapped in, replacing the Phase 0 hand-built scenes and visuals.tsx. Three real rendering bugs found and fixed via visual verification: Diagram's ref-measured fit scaling was non-deterministic in the actual renderStill pipeline (replaced with SVG viewBox), Camera's viewport measurement had the same fragility (replaced with useVideoConfig), and FlowPulse edge labels overlapped node icons on short edges (SVG paint-order halo).
 
-**Final status:**
-**PR / Commit:**
-**Follow-ups:**
+**Final status:** done
+**PR / Commit:** PRs #2, #3, #4, #5 (all merged into main; final merge commit 2ca56e7)
+**Follow-ups:** Phase 2 (DSL + compiler). Carried-over open items are recorded in docs/component-library.md: CJK label overflow in fixed-size Diagram nodes, CameraTarget's ref-measurement staleness risk, non-cut scene transitions not yet threaded through buildTimeline(), and the skipped ESLint import-restriction hardening.
