@@ -13,7 +13,7 @@ workflow.
 | `done` | Phase 1 — 解說元件庫 (Explainer Component Library) | `progress/2026-08-13-phase-1-component-library/` | `motife` | N/A | [phase-1-component-library-plan-next-phase-generic-penguin.md](_plans/phase-1-component-library-plan-next-phase-generic-penguin.md) | 2026-08-13 |  |
 | `done` | Phase 2 pre-work — Phase 1 hardening carry-overs | `progress/2026-08-13-phase-2-hardening-carryover/` | `motife` | N/A | [phase-2-hardening-carryover-plan-next-phase-generic-penguin.md](_plans/phase-2-hardening-carryover-plan-next-phase-generic-penguin.md) | 2026-08-13 |  |
 | `done` | Phase 2 — DSL + Compiler | `progress/2026-08-13-phase-2-dsl-compiler/` | `motife` | N/A | [phase-2-dsl-compiler-phase-2-playful-platypus.md](_plans/phase-2-dsl-compiler-phase-2-playful-platypus.md) | 2026-08-13 |  |
-| `in-progress` | Phase 3 — Agent Pipeline | `progress/2026-08-14-phase-3-agent-pipeline/` | `motife` | N/A | [phase-3-agent-pipeline-silly-soaring-cherny.md](_plans/phase-3-agent-pipeline-silly-soaring-cherny.md) | 2026-08-14 |  |
+| `review` | Phase 3 — Agent Pipeline | `progress/2026-08-14-phase-3-agent-pipeline/` | `motife` | N/A | [phase-3-agent-pipeline-silly-soaring-cherny.md](_plans/phase-3-agent-pipeline-silly-soaring-cherny.md) | 2026-08-14 |  |
 
 ## Status legend
 
