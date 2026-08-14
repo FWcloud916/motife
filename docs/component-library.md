@@ -1,21 +1,28 @@
 # Component Library — Public API Reference
 
 > **Type:** Reference
-> **Audience:** Whoever designs the Phase 2 DSL JSON Schema; anyone writing a new scene
+> **Audience:** Anyone extending `src/components/`; whoever maintains `src/compiler/render/nodes.tsx`
 > **Last updated:** 2026-08-13
 >
-> The Phase 1 deliverable (motife-plan.md §3 Phase 1). Every prop shape
-> below is written as if it *were* the DSL schema draft — that's
-> deliberate: Phase 2's compiler needs to emit these props verbatim from
-> JSON, so every field here is JSON-serializable except `children`
-> (composition slots only, never data). Verify field names/shapes against
+> The Phase 1 deliverable (motife-plan.md §3 Phase 1), extended in Phase 2
+> (motife-plan.md §3 Phase 2) with four more semantic primitives
+> (`Stack`/`Text`/`Meter`/`StepSwitch`) that turned out to be necessary to
+> express Phase 1's own hand-written scenes as data, not just to build the
+> DSL over them — see `docs/primitive-inventory.md`'s "Phase 2 outcome"
+> section for why. Every prop shape below doubles as the DSL schema's
+> vocabulary: `src/dsl/schema.ts` emits these props verbatim from JSON, so
+> every field here is JSON-serializable except the ReactNode slots —
+> `children`, and `StepSwitch`'s `cases[].content` (composition slots
+> only, never data) — see **[docs/dsl-schema.md](dsl-schema.md)** for
+> the DSL's own document-level reference (envelope, scenes, tracks,
+> `WindowRef`, validation). Verify field names/shapes against
 > `src/components/index.ts` (the actual barrel) before treating this as
 > authoritative — this doc can drift; the barrel can't.
 
 ## Import surface
 
-Scenes (`src/remotion/compositions/**`) import exclusively from the
-barrel:
+Scenes (`src/remotion/compositions/**`) and the DSL interpreter
+(`src/compiler/render/**`) import exclusively from the barrel:
 
 ```ts
 import { Scene, Diagram, Callout, tokens, /* ... */ } from "../../../components";
@@ -36,12 +43,19 @@ type Tone = "neutral" | "primary" | "info" | "success" | "warning" | "danger"
           | "syntaxA" | "syntaxB" | "syntaxC";
 type Emphasis = "low" | "medium" | "high";
 type Size = "sm" | "md" | "lg";
+/** Semantic width for a box-like component sitting beside a sibling —
+ * never a raw pixel or percentage. */
+type Measure = "narrow" | "half" | "wide" | "full";  // -> 40% / 55% / 78% / 100%
+/** A layout gap — the only unit Stack's `gap` accepts. */
+type Gap = "none" | "sm" | "md" | "lg" | "xl";
 
 /** A time span as a fraction (0..1) of the enclosing Scene's duration.
  * Every timed component resolves its own animation against a Window
  * instead of a hardcoded frame number — when Phase 3 derives a scene's
  * duration from measured TTS audio, everything inside re-times itself
- * automatically. */
+ * automatically. The DSL's own WindowRef (docs/dsl-schema.md) resolves to
+ * exactly this shape via src/compiler/windows.ts before any component sees
+ * it — no component in this library is aware WindowRef exists. */
 interface Window { from: number; to: number }
 ```
 
@@ -71,17 +85,157 @@ Provides `SceneContext = { durationInFrames, fps }` to every descendant via
 `useSceneTiming()` — this is what lets `Window`-based components resolve
 their timing without their own duration prop.
 
+## `Stack` — the only layout primitive
+
+```ts
+interface StackProps {
+  direction?: "row" | "column";     // default "column"
+  align?: "start" | "center" | "end" | "stretch";
+  justify?: "start" | "center" | "end" | "between";
+  gap?: Gap;                        // default "md"
+  width?: Measure;
+  /** Take a proportional share of the remaining space in the enclosing
+   * Stack's main axis, and — since a top-level Stack is usually handed
+   * directly to a Scene's content slot rather than another Stack — also
+   * fill 100% of that parent's height. */
+  grow?: boolean;
+  window?: Window;
+  children?: ReactNode;
+}
+```
+
+Plain `display: flex`; never wraps or measures its children. A child's
+main-axis size is either "size to content" (omit `grow`) or an equal
+`flex: 1 1 0` share (`grow: true`) — there is no `weights` array; give two
+Stacks different `width` tokens for an unequal split instead.
+
+**`min-{height,width}: 0` is scoped to the main axis, and only when `grow`
+is set.** A `grow` Stack needs it to correctly shrink to (and give its own
+children a definite size from) whatever share its flex parent actually
+allocates — this is what lets a `<Camera>` inside a `grow` Stack resolve
+`height: 100%` correctly. A **non-`grow`** Stack deliberately keeps the
+browser's default `min-height: auto` on its main axis, so it never shrinks
+below its own content's natural size when a sibling overflows the
+container — see the real bug this fixed: a header Stack (no `grow`) sitting
+next to a tall multi-rank `Diagram` collapsed to ~2px of layout height
+while its hero-scale text kept painting at full size past the collapsed
+box, reading as if the text overlapped the diagram. The cross axis keeps
+`min: 0` unconditionally regardless of `grow` — that's the standard fix for
+long unbreakable content overflowing sideways, and carries no such risk.
+
+## `Text` — semantic typography
+
+```ts
+type TextRole = "hero" | "title" | "subtitle" | "label" | "body" | "detail";
+type TextRun = string | { text: string; tone?: Tone; strong?: boolean };
+
+interface TextProps {
+  role?: TextRole;         // default "body"
+  content: string | TextRun[];
+  tone?: Tone;
+  align?: "start" | "center" | "end";
+  window?: Window;
+}
+```
+
+The one place font size/weight/letter-spacing live for scene text:
+
+| role | fontSize | weight | letterSpacing | default color |
+|---|---|---|---|---|
+| `hero` | `xl` (104) | 820 | −5 | text |
+| `title` | `lg` (72) | 750 | −2.5 | text |
+| `subtitle` | 28 | 600 | 1 | textMuted |
+| `label` | `xs` (20) | 800 | 3, uppercase | tone `fg`, else textMuted |
+| `body` | `md` (42) | 700 | 0 | text |
+| `detail` | `sm` (26) | 400 | 0 | textMuted |
+
+`hero`/`title` carry `Scene`'s own header sizing verbatim — swapping a
+hand-styled header block for `<Text role="hero">` is a byte-identical
+replacement, not an approximation (verified via pixel-diff A/B against the
+Phase 1 stills during the port). `TextRun[]` reuses `CodeSegment`'s shape
+and is how an inline `<strong>` run (e.g. "Sign · Verify · Authorize"
+standing out of an otherwise-muted sentence) is expressed.
+
+## `Meter` — progress / level bar
+
+```ts
+interface MeterProps {
+  window?: Window;    // animate 0->1 across this window...
+  value?: number;      // ...XOR hold a fixed 0..1 level (window wins if both given)
+  tone?: Tone;
+  label?: string;
+  size?: Size;
+  threshold?: number;  // marker line on the track — e.g. a backpressure high-water mark
+}
+```
+
+The semantic replacement for a hand-rolled `interpolate()`-driven width%
+bar with a literal `boxShadow` — exactly the CSS-like construct
+motife-plan.md §2 決策2 forbids in the DSL.
+
+## `StepSwitch` — step-synced content
+
+```ts
+interface StepSwitchCase { steps: [number, number]; content: ReactNode }  // inclusive step-index range
+interface StepSwitchProps {
+  /** One Window per step — normally stepWindows()'s output for the same
+   * steps/window a sibling <StepReveal> (or useSteps()) uses, which is
+   * what keeps a checklist and its detail panel in sync. */
+  stepWindows: Window[];
+  cases: StepSwitchCase[];
+  /** "latch" (default): once a step starts, its matching case stays shown
+   * until the next case's steps begin — generalises Phase 0's activeIndex
+   * fallback. "switch": a case shows only while its own step range is
+   * strictly active. */
+  mode?: "latch" | "switch";
+}
+```
+
+Renders whichever `cases` entry covers the step current at the frame — the
+semantic replacement for a `activeIndex === n ? <X/> : null` conditional
+chain. A range-based case (`[0, 2]`) collapses what would otherwise be
+three duplicated single-step branches.
+
+## `stepWindows()` — the helper that removes frame math from scenes
+
+```ts
+/** Each step's span as a Window (fractions of the enclosing Scene) — the
+ * duration-independent counterpart of resolveSteps(). Exact, because
+ * resolveSteps is linear in durationInFrames. */
+function stepWindows(steps: readonly WeightedStep[], window: Window): Window[];
+```
+
+This is what makes the DSL's symbolic `{track, step}`/`{track, steps}`
+window references (docs/dsl-schema.md) a **pure compile-time** resolution
+rather than a render-time React context: the interpreter never needs step
+state, and `src/compiler/validate.ts` can range-check a step index
+statically before anything renders.
+
 ## `Callout`
 
 Absorbs Phase 0's Pill/Card/status-banner primitives into one
-tone/emphasis/size-driven component.
+tone/emphasis/size-driven component. In the DSL, its three variants become
+three separate node types (`pill`/`card`/`banner`) — see docs/dsl-schema.md
+— since zod's discriminated union needs one tag per shape; the underlying
+React component still takes a `variant` field.
 
 ```ts
 type CalloutProps =
   | { variant: "pill"; text: string; icon?: IconName; tone?: Tone; window?: Window }
-  | { variant: "card"; emphasis?: Emphasis; size?: Size; tone?: Tone; window?: Window; children: ReactNode }
+  | { variant: "card"; emphasis?: Emphasis; size?: Size; tone?: Tone; window?: Window;
+      /** Semantic width, for a card sitting beside a sibling inside a Stack row. */
+      width?: Measure;
+      /** Take a proportional share of the enclosing Stack's main axis. */
+      grow?: boolean;
+      children: ReactNode }
   | { variant: "banner"; text: string; detail?: string; icon?: IconName; tone?: Tone; window?: Window };
 ```
+
+**Card interior alignment:** `alignItems: "stretch"` (not Phase 1's
+`"center"`) — once a `Stack` is the card's interior, the Stack's own
+`align` decides cross-axis alignment; `"center"` fought every scene into
+re-declaring `alignSelf` overrides. A/B'd against the Phase 1 stills
+(`docs/assets/*-v2.png`) with zero visual regression before landing.
 
 ## `StepReveal`
 
@@ -110,8 +264,10 @@ interface StepRevealProps {
 anything. Use it when a sibling component (e.g. a detail panel) needs to
 stay in sync with the checklist's timing: call it with the *exact* same
 `steps`/`window` and both derive identical boundaries, since it's the same
-pure function underneath (see `src/remotion/compositions/jwt-auth/scenes/Walkthrough.tsx`
-for a real example).
+pure function underneath. In the DSL, a `steps` node (docs/dsl-schema.md)
+renders `<StepReveal>` directly off a scene-level `track`; a `switch` node
+renders `<StepSwitch>` the same way — see
+`src/compiler/render/nodes.tsx`'s `StepsNodeRenderer`/`SwitchNodeRenderer`.
 
 ## `Diagram` + layout (`GraphSpec` → `LayoutResult`)
 
@@ -140,17 +296,31 @@ interface GraphSpec {
   edges: GraphEdgeSpec[];
 }
 
+/** A node id active from frame 0, or one that only becomes active once
+ * `window` begins — and then stays active (a one-way threshold; `window.to`
+ * is ignored). Widened in Phase 2 from a plain `string[]` so a Diagram no
+ * longer needs its caller to compute `frame > n ? [...] : []` by hand. */
+type DiagramActiveNode = string | { node: string; window: Window };
+
 interface DiagramProps {
   graph: GraphSpec;
   /** "contain" (default): fit within the given box, preserving aspect
    * ratio (SVG viewBox — no JS measurement). "width": grow the element's
    * own height to match its aspect ratio at 100% width. */
   fit?: "width" | "contain";
-  activeNodes?: string[];
+  activeNodes?: DiagramActiveNode[];
   reveal?: { order?: "rank" | "all"; window?: Window };
   /** Convenience: render these FlowPulses inside this Diagram's own
    * layout context instead of nesting <FlowPulse> by hand. */
   flows?: FlowSpec[];
+  /** Semantic width, for a Diagram sitting beside a sibling inside a Stack
+   * row. No effect when nested inside a <Camera> (native scale always). */
+  width?: Measure;
+  /** Take a proportional share of the enclosing Stack's main axis. Pair
+   * with `fit: "contain"` when the allocated box's aspect ratio isn't
+   * known ahead of time — "width" ties height to the graph's own aspect
+   * ratio and can overflow a `grow`d box instead of fitting it. */
+  grow?: boolean;
   /** Overlay slot — e.g. a nested <Camera>, or annotations. */
   children?: ReactNode;
 }
@@ -201,8 +371,8 @@ routed path) — or use `Diagram`'s `flows` prop as a convenience.
 ## `CodeBlock`
 
 Own tokenized micro-model — no shiki/prism. Segments carry a `Tone`
-instead of being syntax-parsed at render time, since Phase 2's LLM/compiler
-can emit pre-tokenized segments directly.
+instead of being syntax-parsed at render time, since the DSL/compiler
+emits pre-tokenized segments directly.
 
 ```ts
 type CodeSegment = string | { text: string; tone: Tone };
@@ -217,10 +387,16 @@ interface CodeHighlight {
 }
 interface CodeBlockProps {
   title?: string;
+  /** "panel" (default): the gradient/border/shadow/padding chrome.
+   * "bare": drops all of it, for a CodeBlock nested inside a Card — avoids
+   * double chrome, and gains the card's own staggered reveal for free. */
+  chrome?: "panel" | "bare";
   lines: CodeLine[];
   reveal?: { mode?: "all" | "staggered"; window?: Window };
   highlights?: CodeHighlight[];
   size?: Size;
+  width?: Measure;
+  grow?: boolean;
 }
 ```
 
@@ -240,6 +416,16 @@ interface TerminalProps {
   title?: string;
   steps: TerminalStep[];
   size?: Size;
+  width?: Measure;
+  /** Take a proportional share of the enclosing Stack's main axis. When
+   * `grow` isn't set, Terminal sets `flexShrink: 0` on itself — without
+   * it, a Terminal stacked below taller siblings in a height-constrained
+   * flex column (e.g. a Card sized to match a neighbouring Card via
+   * Stack's `align="stretch"`) gets silently flex-shrunk below its own
+   * content height, and `overflow: hidden` clips the shrunk-away content
+   * with no visible error — a real bug found while authoring the MQ
+   * backpressure video's Terminal-showing walkthrough case. */
+  grow?: boolean;
 }
 ```
 
@@ -264,7 +450,14 @@ interface CameraProps {
 ```
 
 Assumes it fills the full composition frame — its viewport size comes from
-Remotion's `useVideoConfig()`, not a DOM measurement.
+Remotion's `useVideoConfig()`, not a DOM measurement. **This is
+load-bearing, not a soft preference:** the pan/zoom transform centers on
+the composition's own width/height regardless of what box actually
+contains the `<Camera>`, so nesting it inside a narrower sibling (e.g. half
+a row's width, beside a steps list) breaks framing outright — confirmed by
+a real repro while authoring the DB index video's first narrative Camera
+use. Give `<Camera>` the full scene content width; put an accompanying
+step list *above or below* it, never *beside* it.
 
 `<CameraTarget id>` registers a non-Diagram child's box as a focusable
 target by id (fallback path for content a nested `Diagram` doesn't already
@@ -315,9 +508,46 @@ The eval-set videos deliberately use hard cuts at every boundary
 baseline). `ComponentGallery` carries one fade so the path is exercised by
 every `pnpm smoke` run rather than shipping untested.
 
-## Open items for Phase 2
+## Quality ladder: JWT anatomy / claims validation / summary stills
 
-None outstanding — the Phase 1 carry-overs (Diagram node measuring,
-CameraTarget measurement, transition overlap math, and barrel-import
-enforcement) were all closed before Phase 2 began. The barrel rule is now
-enforced by ESLint, not convention; see "Import surface" above.
+Three canonical frames, captured at each generation this library passed
+through — the durable evidence that no generation regressed the one before
+it:
+
+| Generation | Anatomy | Claims validation | Summary |
+|---|---|---|---|
+| v1 — Phase 0 hand-built | [png](assets/jwt-auth-anatomy.png) | [png](assets/jwt-auth-validation.png) | [png](assets/jwt-auth-summary.png) |
+| v2 — Phase 1 component-library rebuild (hand-written props) | [png](assets/jwt-auth-anatomy-v2.png) | [png](assets/jwt-auth-validation-v2.png) | [png](assets/jwt-auth-summary-v2.png) |
+| v3 — Phase 2 DSL port (same props, now JSON) | [png](assets/jwt-auth-anatomy-v3.png) | [png](assets/jwt-auth-validation-v3.png) | [png](assets/jwt-auth-summary-v3.png) |
+
+What the pixel-diff gate actually proved: the DSL port is byte-identical
+to the *Stage 1 primitive rewrite* of the TSX scenes (`magick compare
+-metric AE` returns `0` between the two at all three frames), and the
+Stage 7 cutover changed zero pixels versus that. v2 → v3 is **not**
+pixel-identical — the Stage 1 rewrite carries small deliberate deltas
+against v2 (the card captions' divider line has no DSL semantic and was
+dropped; card interiors center rather than pin the caption to the bottom).
+One genuine regression also slipped through that gate — the anatomy
+frame's JWT token bar was wrapped in a `width: "wide"` Stack too narrow
+for its unbreakable 132-char line, overflowing the frame edge — because
+both sides of the A/B shared the bug; it was caught by eye against v2
+post-cutover and fixed in the DSL document (the v3 still above is the
+fixed version). Lesson recorded for Phase 3's critique loop: an A/B
+against the *previous* generation, not just the current baseline, is what
+catches a defect both current candidates share.
+
+## Open items for Phase 3
+
+- **`z.toJSONSchema()` output uses `$ref`/`$defs`** for the DSL's recursive
+  node union — structured-output APIs vary in `$ref` support. May need
+  depth-limited flattening before it can be handed to an LLM call directly;
+  not yet attempted (see docs/dsl-schema.md).
+- **`Camera`'s full-composition-frame assumption** (see `Camera` above) is
+  a real constraint an LLM-authored document could easily violate (nesting
+  a `camera` node inside a narrower Stack reads as legal DSL and fails only
+  visually). `src/compiler/validate.ts` doesn't currently catch this —
+  worth a validation rule if Phase 3's critique loop finds it recurring.
+- No open items carried over from Phase 1 — those (Diagram node measuring,
+  CameraTarget measurement, transition overlap math, barrel-import
+  enforcement) were all closed before Phase 2 began. The barrel rule is
+  enforced by ESLint, not convention; see "Import surface" above.

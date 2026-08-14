@@ -28,6 +28,20 @@ export type Emphasis = "low" | "medium" | "high";
 export type Size = "sm" | "md" | "lg";
 
 /**
+ * Semantic width for a "box-like" component (Stack, Callout card, Diagram,
+ * CodeBlock, Terminal) sitting beside a sibling — never a raw pixel or
+ * percentage in a DSL field (motife-plan.md §2 決策2). Approximates the
+ * hand-picked pixel widths Phase 1 scenes used (e.g. Walkthrough's 430px
+ * checklist column ≈ "narrow" of a ~1660px content row) without the DSL
+ * ever stating a pixel.
+ */
+export type Measure = "narrow" | "half" | "wide" | "full";
+
+/** A layout gap, spacing-token driven — the only unit a Stack's `gap`
+ * accepts. */
+export type Gap = "none" | "sm" | "md" | "lg" | "xl";
+
+/**
  * A time span expressed as a fraction (0..1) of the enclosing Scene's
  * duration. Every component resolves its own animation timing against a
  * Window instead of a hardcoded frame number, so when Phase 3 derives a
@@ -79,6 +93,15 @@ const tone: Record<Tone, ToneRecipe> = {
   syntaxA: recipe(palette.header),
   syntaxB: recipe(palette.payload),
   syntaxC: recipe(palette.signature),
+};
+
+/** Percentage widths behind each `Measure` token. Approximate by design —
+ * see the `Measure` doc comment. */
+export const MEASURE_WIDTH: Record<Measure, string> = {
+  narrow: "40%",
+  half: "55%",
+  wide: "78%",
+  full: "100%",
 };
 
 export const tokens = {

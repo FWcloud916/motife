@@ -76,3 +76,30 @@ export function stepStateAtFrame(frame: number, range: StepFrameRange): StepStat
   if (frame < range.endFrame) return "active";
   return range.outcome === "fail" ? "failed" : "passed";
 }
+
+/**
+ * Each step's span as a Window (fractions of the enclosing Scene), rather
+ * than absolute frames. The duration-independent counterpart of
+ * resolveSteps(): dividing resolveSteps()'s frame boundaries by
+ * durationInFrames would recover exactly this, since resolveSteps is linear
+ * in durationInFrames — so this is computed directly from the window
+ * fractions instead, with no durationInFrames input at all.
+ *
+ * This is what lets a scene author (or the Phase 2 DSL) reference "while
+ * step 1 is active" as a Window without a render-time frame or a
+ * StepReveal/useSteps() call — see StepSwitch, which consumes exactly this
+ * shape to pick its active case.
+ */
+export function stepWindows(steps: readonly WeightedStep[], window: Window): Window[] {
+  const totalWeight = steps.reduce((sum, step) => sum + (step.weight ?? 1), 0);
+  const span = window.to - window.from;
+
+  let cursor = window.from;
+  return steps.map((step) => {
+    const share = totalWeight > 0 ? (step.weight ?? 1) / totalWeight : 0;
+    const stepSpan = span * share;
+    const stepWindow: Window = { from: cursor, to: cursor + stepSpan };
+    cursor += stepSpan;
+    return stepWindow;
+  });
+}

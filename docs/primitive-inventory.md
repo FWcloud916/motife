@@ -85,10 +85,11 @@ below for what actually got built.
 All 8 planned components were built under `src/components/`, per PR
 sequence [tokens-and-foundation → diagram-flow-code → jwt-rebuild →
 swap-and-cleanup]. `Terminal` and `Camera` — unused at Phase 0 exit — were
-built speculatively per the plan; they're exercised by the
-`ComponentGallery` demo composition (`src/remotion/compositions/gallery/`)
-but not yet by a real narrative video. They're expected to see real use in
-the eval set's other two videos (MQ backpressure, DB index internals).
+built speculatively per the plan; at Phase 1 exit they were exercised only
+by the `ComponentGallery` demo composition
+(`src/remotion/compositions/gallery/`), not yet by a real narrative video.
+Phase 2 gave both their first real narrative use — see "Phase 2 outcome"
+below.
 
 Acceptance (motife-plan.md milestone M1) passed: `JwtAuthFlow` was rebuilt
 entirely from `src/components/` with hand-written props, replacing the
@@ -112,3 +113,58 @@ direct comparison:
 - [JWT anatomy — v2](assets/jwt-auth-anatomy-v2.png)
 - [Claims validation — v2](assets/jwt-auth-validation-v2.png)
 - [Summary — v2](assets/jwt-auth-summary-v2.png)
+
+The same three frames again after the Phase 2 DSL port (pixel-identical to
+the Stage 1 primitive rewrite it was A/B'd against; carries small
+deliberate deltas vs v2 — see `docs/component-library.md`'s quality-ladder
+table for the details and one regression that gate missed):
+
+- [JWT anatomy — v3](assets/jwt-auth-anatomy-v3.png)
+- [Claims validation — v3](assets/jwt-auth-validation-v3.png)
+- [Summary — v3](assets/jwt-auth-summary-v3.png)
+
+## Phase 2 outcome
+
+Porting the Phase 1 hand-written scenes to a JSON-serializable form (before
+any DSL schema existed to validate against) surfaced a real gap the Phase 1
+component list didn't anticipate — exactly the kind of finding this doc's
+own instructions call most valuable. Counted across the four JWT scenes and
+`ComponentGallery`, roughly half of every scene's lines were raw JSX/inline
+CSS with no expression in any Phase 1 component's props: hand-rolled
+flexbox rows and columns, fixed-px width/height boxes, hand-styled text
+blocks (fontFamily+fontSize+fontWeight+letterSpacing+color), a hand-rolled
+`interpolate()` progress bar with a literal `boxShadow` (forbidden in the
+DSL outright — motife-plan.md §2 決策2), and conditional renders keyed on a
+step index (`activeIndex === n ? … : null`).
+
+Four new primitives closed that gap, added to `src/components/` *before*
+any JSON existed — proved out in TypeScript first, exactly as
+motife-plan.md's phasing intends:
+
+| New primitive | Replaces | Notes |
+|---|---|---|
+| `Stack` | every hand-rolled `display: flex` row/column, `flex: 1` columns, `justify-content: space-between` rows, fixed px widths | Became the DSL's *only* layout primitive — no `className`/coordinates ever needed an escape hatch |
+| `Text` | every hand-styled text `<div>` (6 distinct role/size/weight combinations found in practice) | Role table (`hero`/`title`/`subtitle`/`label`/`body`/`detail`) is a byte-identical replacement for the Phase 1 values, not an approximation |
+| `Meter` | the hand-rolled `interpolate()` progress bar with a `boxShadow` | Directly forbidden-construct removal; reused again by the MQ backpressure video for queue depth vs. a `threshold` |
+| `StepSwitch` | `activeIndex === n ? <X/> : null` conditional chains | Collapsed Walkthrough's four single-step branches to two range-based cases |
+
+Two existing components gained props rather than needing a new primitive:
+`CodeBlock` (`chrome: "bare"`, for nesting inside a `Card` without double
+chrome) and `Diagram` (`activeNodes` widened from `string[]` to
+`Array<string | {node, window}>`, removing the last `useCurrentFrame()`
+from scene code). Full current shapes: `docs/component-library.md`.
+
+Both `Terminal` and `Camera` — unused at Phase 0 exit, built speculatively
+in Phase 1 — saw their first real narrative use in Phase 2: `Terminal` in
+the MQ backpressure video's walkthrough (which also surfaced a genuine
+`flexShrink` bug, since fixed — see `docs/component-library.md`), and
+`Camera` in the DB index video's lookup walkthrough (which surfaced that
+its "fills the full composition frame" assumption is load-bearing, not
+advisory — also documented there).
+
+No component needed a new *node type of its own* to express one of the 14
+DSL node kinds it wasn't already capable of — the gap was entirely in
+layout/text primitives, not in the diagram/code/terminal/camera components
+Phase 1 already built. That is itself a small piece of evidence that Phase
+1's component list, aimed at "reproduce the hand-built baseline," was
+close to the right shape for "express arbitrary DSL content" too.

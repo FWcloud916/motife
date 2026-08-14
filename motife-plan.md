@@ -49,10 +49,10 @@ Prompt(概念描述)
 
 先建立「好」的標準,再寫任何系統程式碼。
 
-- [ ] 挑 3 個自己能判斷好壞的概念作為 eval set,建議:JWT 驗證流程、Message Queue 背壓、DB Index 原理
-- [ ] 純手工用 Remotion 做出其中 1 支目標影片(不用 AI),這支就是品質基準線
-- [ ] 從手工過程中記錄:實際用到哪些視覺原語?哪些動作重複出現?→ 這份清單就是元件庫的需求規格
-- [ ] 確認 Remotion 授權條款對未來商用計畫的影響
+- [x] 挑 3 個自己能判斷好壞的概念作為 eval set,建議:JWT 驗證流程、Message Queue 背壓、DB Index 原理
+- [x] 純手工用 Remotion 做出其中 1 支目標影片(不用 AI),這支就是品質基準線
+- [x] 從手工過程中記錄:實際用到哪些視覺原語?哪些動作重複出現?→ 這份清單就是元件庫的需求規格
+- [x] 確認 Remotion 授權條款對未來商用計畫的影響
 
 **出場條件:有一支自己滿意的手工影片,和一份原語清單。**
 
@@ -60,25 +60,32 @@ Prompt(概念描述)
 
 把手工影片重構成可參數化的元件。目標 8–10 個:
 
-- [ ] `Scene` — 場景容器、轉場
-- [ ] `Diagram` — 節點 + 連線,ELK 自動排版
-- [ ] `FlowPulse` — 沿路徑的資料流動畫
-- [ ] `CodeBlock` — 逐行 highlight / diff 動畫(參考 Motion Canvas 的 API 設計)
-- [ ] `Terminal` — 指令輸出模擬
-- [ ] `Camera` — zoom / pan / focus 包裝(參考 Motion Canvas)
-- [ ] `StepReveal` — 漸進揭露
-- [ ] `Callout` — 標註、強調
-- [ ] 設計 token 系統:色彩、字型、間距、easing 全部集中定義,元件不接受任意樣式
+- [x] `Scene` — 場景容器、轉場
+- [x] `Diagram` — 節點 + 連線,ELK 自動排版
+- [x] `FlowPulse` — 沿路徑的資料流動畫
+- [x] `CodeBlock` — 逐行 highlight / diff 動畫(參考 Motion Canvas 的 API 設計)
+- [x] `Terminal` — 指令輸出模擬
+- [x] `Camera` — zoom / pan / focus 包裝(參考 Motion Canvas)
+- [x] `StepReveal` — 漸進揭露
+- [x] `Callout` — 標註、強調
+- [x] 設計 token 系統:色彩、字型、間距、easing 全部集中定義,元件不接受任意樣式
 
-**驗收:用元件庫「以手寫 props 的方式」重建 Phase 0 那支影片,品質不輸手工版。**
+**驗收:用元件庫「以手寫 props 的方式」重建 Phase 0 那支影片,品質不輸手工版。** ✅ 已達成 —
+`docs/assets/jwt-auth-*-v2.png` 與 v1 逐幀比對通過。
 
 ### Phase 2 — DSL + Compiler(約 2 週)
 
-- [ ] 定義 JSON Schema:敘事骨架採「引入 → 拆解 → 逐步演示 → 總結」,每個 step 含元件引用、參數、旁白文字
-- [ ] Compiler:DSL → Remotion composition,含 schema validation 與可讀的錯誤訊息(錯誤訊息品質 = agent 自我修復能力)
-- [ ] 手寫 3 份 DSL 對應 eval set 的 3 個概念,跑通 DSL → MP4 全流程
+- [x] 定義 JSON Schema:敘事骨架採「引入 → 拆解 → 逐步演示 → 總結」,每個 step 含元件引用、參數、旁白文字
+- [x] Compiler:DSL → Remotion composition,含 schema validation 與可讀的錯誤訊息(錯誤訊息品質 = agent 自我修復能力)
+- [x] 手寫 3 份 DSL 對應 eval set 的 3 個概念,跑通 DSL → MP4 全流程
 
-**驗收:不碰 TypeScript、只改 JSON 就能產出一支完整影片。**
+**驗收:不碰 TypeScript、只改 JSON 就能產出一支完整影片。** ✅ 已達成 —
+`pnpm render:dsl <doc.json> <out.mp4>` 對任意合法 DSL 文件皆可用；三份 eval set
+(`jwt-auth.json`、`mq-backpressure.json`、`db-index.json`)皆已跑通 DSL → MP4。
+過程中額外發現並補上 4 個 Phase 1 未預期到的原語(`Stack`/`Text`/`Meter`/
+`StepSwitch`,見 `docs/primitive-inventory.md`「Phase 2 outcome」)才使既有影片能以
+純 JSON 表達；`docs/dsl-schema.md` 為完整規格文件,`src/dsl/`/`src/compiler/`
+為實作。手工版 TSX 場景已在 v2/v3 逐幀比對確認零像素差異後刪除。
 
 ### Phase 3 — Agent Pipeline(約 2–3 週)
 
@@ -131,6 +138,16 @@ Prompt(概念描述)
 
 ## 6. 立即下一步
 
-1. 挑定 eval set 的 3 個概念
-2. 開始 Phase 0 的手工影片(這一步同時也是學 Remotion 的最快路徑)
-3. 手工過程中持續記錄原語清單
+Phase 0/1/2 皆已完成並驗收(見上方各 Phase 勾選項與驗收說明)。下一步是
+Phase 3 — Agent Pipeline:
+
+1. 設計 Prompt → DSL 的 system prompt:以 `docs/dsl-schema.md` 為規格來源,
+   `src/dsl/docs/*.json` 三份手寫文件當 few-shot 範例
+2. 整合 TTS:旁白音檔 → 量測長度 → 回填每個 scene 的 `durationInSeconds`
+   (取代目前手動猜測的暫定值)
+3. 串 compiler 的錯誤回饋迴圈:`formatIssues()` 的輸出已針對「LLM 讀了能不能
+   照著修」設計(見 `docs/dsl-schema.md`「Validation issue codes」),驗證
+   失敗時把整段文字餵回 LLM retry
+4. 建 critique loop:`renderStill()` 抽關鍵影格 → vision model 檢查 → 產生
+   DSL 修改 → re-render,設最大迭代次數
+5. 對 eval set 3 個概念全自動跑一輪,人工評分(驗收標準見上方 Phase 3)

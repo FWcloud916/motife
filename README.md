@@ -27,8 +27,10 @@ pnpm install
 ### Run
 
 ```bash
-pnpm dev       # open Remotion Studio
-pnpm render    # render out/jwt-auth-flow.mp4
+pnpm dev          # open Remotion Studio
+pnpm render       # render out/jwt-auth-flow.mp4 (composition id "JwtAuthFlow", DSL-backed)
+pnpm render:dsl <doc.json> <out.mp4>   # render ANY valid DSL document — no TypeScript, no
+                                        # baseline registration needed
 ```
 
 ### Test
@@ -41,21 +43,29 @@ pnpm verify    # typecheck + lint + render smoke test — the verification gate 
 
 ```text
 motife/
-├── motife-plan.md       # source project plan (Chinese)
-├── src/remotion/         # Remotion composition source (Phase 0: JwtAuthFlow)
-├── scripts/smoke.mjs     # render smoke test
-├── docs/                 # generated documentation
-└── progress/             # development progress tracker
+├── motife-plan.md        # source project plan (Chinese)
+├── src/
+│   ├── components/       # the explainer component library (Stack, Text, Diagram, Camera, ...)
+│   ├── dsl/               # the JSON DSL — schema + hand-authored eval-set documents
+│   ├── compiler/          # DSL -> Remotion, by render-time interpretation (no codegen)
+│   └── remotion/          # Remotion entry point + composition registrations
+├── scripts/
+│   ├── smoke.mjs          # render smoke test
+│   └── render-dsl.mjs     # pnpm render:dsl driver
+├── docs/                  # generated documentation
+└── progress/              # development progress tracker
 ```
 
-See [docs/project-overview.md §4](docs/project-overview.md#4-directory-structure) for the full annotated tree, including space reserved for later phases.
+See [docs/project-overview.md §4](docs/project-overview.md#4-directory-structure) for the full annotated tree.
 
 ## Documentation
 
 | Doc | What it covers |
 |---|---|
 | [docs/project-overview.md](docs/project-overview.md) | Architecture, tech stack decisions, directory map, phased roadmap references |
-| [docs/primitive-inventory.md](docs/primitive-inventory.md) | Visual primitives recorded while hand-building the Phase 0 baseline video — the Phase 1 component-library spec |
+| [docs/dsl-schema.md](docs/dsl-schema.md) | The DSL document reference — envelope, scenes, tracks, node types, validation errors |
+| [docs/component-library.md](docs/component-library.md) | Public component API reference — the DSL's own vocabulary source |
+| [docs/primitive-inventory.md](docs/primitive-inventory.md) | Visual primitives recorded while hand-building the Phase 0 baseline video — the Phase 1 component-library spec, plus Phase 2's outcome |
 | [motife-plan.md](motife-plan.md) | Full project plan: phased roadmap, design decisions, risks, milestones (source of truth, Chinese) |
 
 ## License

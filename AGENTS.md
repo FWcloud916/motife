@@ -16,6 +16,7 @@ An AI agent system that turns a technical concept description into a motion-grap
 - `interpolate()` MUST pass `extrapolateLeft`/`extrapolateRight: 'clamp'` unless extending past the range is intended — the default (`'extend'`) is a common bug source (source: Remotion docs)
 - The Remotion entry point is `src/remotion/index.ts` (set in `remotion.config.ts`); MUST NOT create `src/index.ts` — it is checked first by the CLI and would silently shadow the real entry (source: remotion.config.ts)
 - `remotion.config.ts` has no effect on `@remotion/renderer`'s SSR APIs (`bundle()`/`renderMedia()`/`renderStill()`); programmatic renders MUST set equivalent options as call arguments, and MUST pass the identical `inputProps` object to `selectComposition()` and `renderMedia()`/`renderStill()` (source: scripts/smoke.mjs, Remotion docs)
+- A `DslDocument` MUST only ever be produced by `parseDocument()`/`parseDocumentOrThrow()` (`src/compiler/parse.ts`) — never constructed as a literal or cast from `unknown`; that bypasses both the zod structural checks and `validate.ts`'s semantic cross-reference checks (source: `src/dsl/types.ts`)
 
 ## Read before you work
 
@@ -24,7 +25,8 @@ Read the matching doc **before non-trivial work**. Small fixes (typos, single-li
 | Task | Read first |
 |---|---|
 | Architecture, request flow, directory layout, integrations | [docs/project-overview.md](docs/project-overview.md) |
-| Visual primitives, Phase 1 component requirements | [docs/primitive-inventory.md](docs/primitive-inventory.md) |
+| Writing or editing a DSL document, adding a node type, validation errors | [docs/dsl-schema.md](docs/dsl-schema.md) |
+| Visual primitives, component API, Phase 1/2 component requirements | [docs/primitive-inventory.md](docs/primitive-inventory.md), [docs/component-library.md](docs/component-library.md) |
 | Current development status, active work item | [progress/INDEX.md](progress/INDEX.md) |
 | Full phased roadmap, design decisions, risks | [motife-plan.md](motife-plan.md) |
 
@@ -41,7 +43,7 @@ pnpm lint       # lint only
 
 - Work is tracked per-task under [progress/](progress/) (progress-tracker skill), not a root `PROGRESS.md` — open or update the relevant item there before starting non-trivial work.
 - `useCurrentFrame()` is relative to the nearest enclosing `<Sequence>`, not the composition's absolute frame — a scene mounted via `<Sequence from={n}>` always sees frame 0 at its own start.
-- New scenes go in `storyboard.ts` + `sceneRegistry.tsx` (see `src/remotion/compositions/jwt-auth/`); `JwtAuthFlow.tsx` and `Root.tsx` wire things automatically and normally don't need edits.
+- New videos are DSL documents, not TypeScript: add a `.json` file under `src/dsl/docs/`, register it in `src/dsl/docs/manifest.ts`'s `RAW_DOCS`, and add its frame pin to `manifest.test.ts` — `Root.tsx` registers a `<Composition>` for every entry automatically. See [docs/dsl-schema.md](docs/dsl-schema.md) for the document format. Adding a new DSL *node type* (rare) additionally needs a schema variant in `src/dsl/schema.ts`, a hand-declared type in `src/dsl/types.ts`, and a renderer in `src/compiler/render/nodes.tsx` — a missing renderer is a compile error, not a silent no-op. `ComponentGallery` (`src/remotion/compositions/gallery/`) is the one composition that stays hand-written TSX permanently.
 
 ## Docs maintenance
 

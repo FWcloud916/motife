@@ -1,0 +1,882 @@
+{
+  "version": 1,
+  "id": "MqBackpressure",
+  "title": "Message Queue 背壓",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "scenes": [
+    {
+      "id": "intro",
+      "beat": "intro",
+      "durationInSeconds": 7,
+      "narration": "當生產者製造訊息的速度超過消費者能處理的速度，佇列會不斷堆積，最終拖垮整個系統。",
+      "caption": "生產速率長期大於消費速率時，佇列就會開始堆積。",
+      "background": {
+        "variant": "grid",
+        "glow": "info"
+      },
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "align": "center",
+        "justify": "center",
+        "gap": "lg",
+        "children": [
+          {
+            "type": "stack",
+            "align": "center",
+            "gap": "sm",
+            "children": [
+              {
+                "type": "pill",
+                "tone": "info",
+                "text": "BACKPRESSURE, EXPLAINED"
+              },
+              {
+                "type": "text",
+                "role": "hero",
+                "content": "當生產者比消費者快",
+                "align": "center"
+              },
+              {
+                "type": "text",
+                "role": "subtitle",
+                "content": "訊息佇列如何避免被壓垮",
+                "align": "center"
+              }
+            ]
+          },
+          {
+            "type": "diagram",
+            "width": "wide",
+            "fit": "width",
+            "graph": {
+              "direction": "right",
+              "nodes": [
+                {
+                  "id": "producer",
+                  "icon": "server",
+                  "label": "Producer",
+                  "tone": "info"
+                },
+                {
+                  "id": "queue",
+                  "icon": "queue",
+                  "label": "Queue",
+                  "tone": "primary"
+                },
+                {
+                  "id": "consumer",
+                  "icon": "server",
+                  "label": "Consumer",
+                  "tone": "success"
+                }
+              ],
+              "edges": [
+                {
+                  "from": "producer",
+                  "to": "queue",
+                  "label": "publish"
+                },
+                {
+                  "from": "queue",
+                  "to": "consumer",
+                  "label": "consume"
+                }
+              ]
+            },
+            "reveal": {
+              "order": "rank",
+              "window": {
+                "from": 0.2,
+                "to": 0.4
+              }
+            },
+            "flows": [
+              {
+                "edge": "producer->queue",
+                "window": {
+                  "from": 0.35,
+                  "to": 0.6
+                },
+                "tone": "info",
+                "label": "msg"
+              },
+              {
+                "edge": "queue->consumer",
+                "window": {
+                  "from": 0.55,
+                  "to": 0.8
+                },
+                "tone": "success",
+                "label": "ack"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "breakdown",
+      "beat": "breakdown",
+      "durationInSeconds": 11,
+      "narration": "生產速率、消費速率、佇列深度，這三個數字決定系統健不健康。沒有設上限的佇列，只是把問題往後延，直到記憶體耗盡才爆炸。",
+      "caption": "沒有上限的佇列不會解決問題，只會把問題往後延。",
+      "background": {
+        "variant": "grid",
+        "glow": "warning"
+      },
+      "header": {
+        "eyebrow": "01 · Pressure",
+        "title": "為什麼佇列會爆掉？"
+      },
+      "content": {
+        "type": "stack",
+        "align": "center",
+        "gap": "lg",
+        "children": [
+          {
+            "type": "stack",
+            "direction": "row",
+            "gap": "lg",
+            "width": "full",
+            "children": [
+              {
+                "type": "card",
+                "tone": "info",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": {
+                  "from": 0.15,
+                  "to": 0.4
+                },
+                "children": [
+                  {
+                    "type": "text",
+                    "role": "label",
+                    "tone": "info",
+                    "content": "PRODUCER RATE"
+                  },
+                  {
+                    "type": "meter",
+                    "tone": "info",
+                    "value": 1
+                  },
+                  {
+                    "type": "text",
+                    "role": "detail",
+                    "content": "持續產生訊息，不會停下來等待"
+                  }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "success",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": {
+                  "from": 0.25,
+                  "to": 0.5
+                },
+                "children": [
+                  {
+                    "type": "text",
+                    "role": "label",
+                    "tone": "success",
+                    "content": "CONSUMER RATE"
+                  },
+                  {
+                    "type": "meter",
+                    "tone": "success",
+                    "value": 0.6
+                  },
+                  {
+                    "type": "text",
+                    "role": "detail",
+                    "content": "受限於處理能力，通常低於生產速率"
+                  }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "warning",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": {
+                  "from": 0.35,
+                  "to": 0.6
+                },
+                "children": [
+                  {
+                    "type": "text",
+                    "role": "label",
+                    "tone": "warning",
+                    "content": "QUEUE DEPTH"
+                  },
+                  {
+                    "type": "meter",
+                    "tone": "warning",
+                    "window": {
+                      "from": 0.4,
+                      "to": 0.85
+                    },
+                    "threshold": 0.85
+                  },
+                  {
+                    "type": "text",
+                    "role": "detail",
+                    "content": "生產與消費的差額，持續累積在這裡"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "pill",
+            "tone": "danger",
+            "text": "⚠ 無界佇列 = 延遲無上限 + OOM",
+            "window": {
+              "from": 0.68,
+              "to": 0.78
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "walkthrough",
+      "beat": "walkthrough",
+      "durationInSeconds": 16,
+      "narration": "常見的因應策略有四種：設定佇列上限讓生產者等待、明確選擇丟棄規則、讓消費端回報處理延遲當作訊號，或者自動增加消費者數量分攤負載。",
+      "caption": "沒有一種策略是萬能的：上限、丟棄、訊號、擴縮，通常要組合使用。",
+      "background": {
+        "variant": "grid",
+        "glow": "primary"
+      },
+      "header": {
+        "eyebrow": "02 · Mitigation",
+        "title": "怎麼因應背壓？"
+      },
+      "tracks": [
+        {
+          "id": "strategies",
+          "window": {
+            "from": 0.05,
+            "to": 0.98
+          },
+          "items": [
+            {
+              "title": "有界佇列",
+              "detail": "滿了就讓生產者等待"
+            },
+            {
+              "title": "丟棄策略",
+              "detail": "滿了就直接拒絕新訊息"
+            },
+            {
+              "title": "消費端訊號",
+              "detail": "回報處理延遲當作回壓訊號"
+            },
+            {
+              "title": "自動擴縮",
+              "detail": "增加消費者數量分攤負載"
+            }
+          ]
+        }
+      ],
+      "content": {
+        "type": "stack",
+        "direction": "row",
+        "grow": true,
+        "gap": "lg",
+        "align": "stretch",
+        "children": [
+          {
+            "type": "card",
+            "emphasis": "medium",
+            "size": "lg",
+            "width": "narrow",
+            "children": [
+              {
+                "type": "steps",
+                "track": "strategies",
+                "label": "MITIGATION STRATEGIES"
+              }
+            ]
+          },
+          {
+            "type": "switch",
+            "track": "strategies",
+            "cases": [
+              {
+                "steps": [
+                  0,
+                  0
+                ],
+                "content": {
+                  "type": "card",
+                  "tone": "info",
+                  "emphasis": "medium",
+                  "size": "lg",
+                  "grow": true,
+                  "children": [
+                    {
+                      "type": "text",
+                      "role": "label",
+                      "tone": "info",
+                      "content": "有界佇列：滿了就讓生產者等待"
+                    },
+                    {
+                      "type": "diagram",
+                      "fit": "width",
+                      "graph": {
+                        "direction": "right",
+                        "nodes": [
+                          {
+                            "id": "producer",
+                            "icon": "server",
+                            "label": "Producer",
+                            "tone": "info"
+                          },
+                          {
+                            "id": "queue",
+                            "icon": "queue",
+                            "label": "Queue",
+                            "tone": "primary"
+                          },
+                          {
+                            "id": "consumer1",
+                            "icon": "server",
+                            "label": "Consumer 1",
+                            "tone": "success"
+                          },
+                          {
+                            "id": "consumer2",
+                            "icon": "server",
+                            "label": "Consumer 2",
+                            "tone": "neutral"
+                          }
+                        ],
+                        "edges": [
+                          {
+                            "from": "producer",
+                            "to": "queue"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer1"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer2"
+                          }
+                        ]
+                      },
+                      "activeNodes": [
+                        "producer",
+                        "queue",
+                        "consumer1"
+                      ],
+                      "flows": [
+                        {
+                          "edge": "producer->queue",
+                          "window": {
+                            "track": "strategies",
+                            "step": 0
+                          },
+                          "tone": "info",
+                          "label": "blocked"
+                        }
+                      ],
+                      "width": "half"
+                    },
+                    {
+                      "type": "meter",
+                      "tone": "warning",
+                      "value": 0.92,
+                      "threshold": 0.92,
+                      "label": "QUEUE DEPTH (capped)"
+                    }
+                  ]
+                }
+              },
+              {
+                "steps": [
+                  1,
+                  1
+                ],
+                "content": {
+                  "type": "card",
+                  "tone": "danger",
+                  "emphasis": "medium",
+                  "size": "lg",
+                  "grow": true,
+                  "children": [
+                    {
+                      "type": "text",
+                      "role": "label",
+                      "tone": "danger",
+                      "content": "丟棄策略：滿了就直接拒絕新訊息"
+                    },
+                    {
+                      "type": "diagram",
+                      "fit": "width",
+                      "graph": {
+                        "direction": "right",
+                        "nodes": [
+                          {
+                            "id": "producer",
+                            "icon": "server",
+                            "label": "Producer",
+                            "tone": "info"
+                          },
+                          {
+                            "id": "queue",
+                            "icon": "queue",
+                            "label": "Queue",
+                            "tone": "primary"
+                          },
+                          {
+                            "id": "consumer1",
+                            "icon": "server",
+                            "label": "Consumer 1",
+                            "tone": "success"
+                          },
+                          {
+                            "id": "consumer2",
+                            "icon": "server",
+                            "label": "Consumer 2",
+                            "tone": "neutral"
+                          }
+                        ],
+                        "edges": [
+                          {
+                            "from": "producer",
+                            "to": "queue"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer1"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer2"
+                          }
+                        ]
+                      },
+                      "activeNodes": [
+                        "producer",
+                        "queue",
+                        "consumer1"
+                      ],
+                      "flows": [
+                        {
+                          "edge": "producer->queue",
+                          "window": {
+                            "track": "strategies",
+                            "step": 1
+                          },
+                          "tone": "danger",
+                          "direction": "reverse",
+                          "label": "dropped"
+                        }
+                      ],
+                      "width": "half"
+                    },
+                    {
+                      "type": "text",
+                      "role": "detail",
+                      "content": "選擇丟新的還是丟舊的，是產品決策，不是技術決策"
+                    }
+                  ]
+                }
+              },
+              {
+                "steps": [
+                  2,
+                  2
+                ],
+                "content": {
+                  "type": "card",
+                  "tone": "primary",
+                  "emphasis": "medium",
+                  "size": "lg",
+                  "grow": true,
+                  "children": [
+                    {
+                      "type": "text",
+                      "role": "label",
+                      "tone": "primary",
+                      "content": "消費端訊號：回報處理延遲當作回壓"
+                    },
+                    {
+                      "type": "diagram",
+                      "fit": "width",
+                      "graph": {
+                        "direction": "right",
+                        "nodes": [
+                          {
+                            "id": "producer",
+                            "icon": "server",
+                            "label": "Producer",
+                            "tone": "info"
+                          },
+                          {
+                            "id": "queue",
+                            "icon": "queue",
+                            "label": "Queue",
+                            "tone": "primary"
+                          },
+                          {
+                            "id": "consumer1",
+                            "icon": "server",
+                            "label": "Consumer 1",
+                            "tone": "success"
+                          },
+                          {
+                            "id": "consumer2",
+                            "icon": "server",
+                            "label": "Consumer 2",
+                            "tone": "neutral"
+                          }
+                        ],
+                        "edges": [
+                          {
+                            "from": "producer",
+                            "to": "queue"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer1"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer2"
+                          }
+                        ]
+                      },
+                      "activeNodes": [
+                        "producer",
+                        "queue",
+                        "consumer1"
+                      ],
+                      "width": "half"
+                    },
+                    {
+                      "type": "terminal",
+                      "steps": [
+                        {
+                          "command": "kafka-consumer-groups --describe --group workers",
+                          "output": [
+                            "LAG: 8200 (saturating)",
+                            "LAG: 340 (after signal)"
+                          ],
+                          "window": {
+                            "track": "strategies",
+                            "step": 2
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "steps": [
+                  3,
+                  3
+                ],
+                "content": {
+                  "type": "card",
+                  "tone": "success",
+                  "emphasis": "medium",
+                  "size": "lg",
+                  "grow": true,
+                  "children": [
+                    {
+                      "type": "text",
+                      "role": "label",
+                      "tone": "success",
+                      "content": "自動擴縮：增加消費者分攤負載"
+                    },
+                    {
+                      "type": "diagram",
+                      "fit": "width",
+                      "graph": {
+                        "direction": "right",
+                        "nodes": [
+                          {
+                            "id": "producer",
+                            "icon": "server",
+                            "label": "Producer",
+                            "tone": "info"
+                          },
+                          {
+                            "id": "queue",
+                            "icon": "queue",
+                            "label": "Queue",
+                            "tone": "primary"
+                          },
+                          {
+                            "id": "consumer1",
+                            "icon": "server",
+                            "label": "Consumer 1",
+                            "tone": "success"
+                          },
+                          {
+                            "id": "consumer2",
+                            "icon": "server",
+                            "label": "Consumer 2",
+                            "tone": "neutral"
+                          }
+                        ],
+                        "edges": [
+                          {
+                            "from": "producer",
+                            "to": "queue"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer1"
+                          },
+                          {
+                            "from": "queue",
+                            "to": "consumer2"
+                          }
+                        ]
+                      },
+                      "activeNodes": [
+                        "producer",
+                        "queue",
+                        "consumer1",
+                        {
+                          "node": "consumer2",
+                          "window": {
+                            "track": "strategies",
+                            "step": 3
+                          }
+                        }
+                      ],
+                      "flows": [
+                        {
+                          "edge": "queue->consumer1",
+                          "window": {
+                            "track": "strategies",
+                            "step": 3
+                          },
+                          "tone": "success"
+                        },
+                        {
+                          "edge": "queue->consumer2",
+                          "window": {
+                            "track": "strategies",
+                            "step": 3
+                          },
+                          "tone": "success"
+                        }
+                      ],
+                      "width": "half"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "summary",
+      "beat": "summary",
+      "durationInSeconds": 6,
+      "narration": "記住三件事：佇列永遠要設上限、丟棄或阻塞要事先決定、該看的是消費延遲，不是佇列長度。",
+      "caption": null,
+      "background": {
+        "variant": "grid",
+        "glow": "info"
+      },
+      "header": {
+        "eyebrow": "THE TAKEAWAY",
+        "title": "設計佇列，就是設計失敗模式",
+        "tone": "info",
+        "scale": "hero"
+      },
+      "content": {
+        "type": "stack",
+        "grow": true,
+        "justify": "center",
+        "gap": "xl",
+        "children": [
+          {
+            "type": "stack",
+            "direction": "row",
+            "align": "center",
+            "gap": "lg",
+            "children": [
+              {
+                "type": "card",
+                "tone": "info",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": {
+                  "from": 0.13,
+                  "to": 0.38
+                },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      {
+                        "type": "text",
+                        "role": "label",
+                        "tone": "info",
+                        "content": "01"
+                      },
+                      {
+                        "type": "icon",
+                        "name": "lock",
+                        "tone": "info"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "role": "body",
+                    "content": "永遠設定佇列上限"
+                  },
+                  {
+                    "type": "text",
+                    "role": "detail",
+                    "content": "無界佇列只是把問題往後延"
+                  }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "warning",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": {
+                  "from": 0.21,
+                  "to": 0.46
+                },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      {
+                        "type": "text",
+                        "role": "label",
+                        "tone": "warning",
+                        "content": "02"
+                      },
+                      {
+                        "type": "icon",
+                        "name": "cross",
+                        "tone": "warning"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "role": "body",
+                    "content": "明確決定丟棄或阻塞"
+                  },
+                  {
+                    "type": "text",
+                    "role": "detail",
+                    "content": "不決定，就是讓系統幫你決定"
+                  }
+                ]
+              },
+              {
+                "type": "card",
+                "tone": "success",
+                "emphasis": "medium",
+                "size": "lg",
+                "grow": true,
+                "window": {
+                  "from": 0.29,
+                  "to": 0.54
+                },
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "justify": "between",
+                    "align": "center",
+                    "children": [
+                      {
+                        "type": "text",
+                        "role": "label",
+                        "tone": "success",
+                        "content": "03"
+                      },
+                      {
+                        "type": "icon",
+                        "name": "check",
+                        "tone": "success"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "role": "body",
+                    "content": "監控消費延遲，不是佇列長度"
+                  },
+                  {
+                    "type": "text",
+                    "role": "detail",
+                    "content": "長度會騙人，落後的時間不會"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "stack",
+            "direction": "row",
+            "align": "center",
+            "justify": "center",
+            "gap": "md",
+            "window": {
+              "from": 0.6,
+              "to": 1
+            },
+            "children": [
+              {
+                "type": "icon",
+                "name": "queue",
+                "tone": "info",
+                "size": "sm"
+              },
+              {
+                "type": "text",
+                "role": "detail",
+                "content": [
+                  {
+                    "text": "Bounded · Explicit · Observed",
+                    "strong": true
+                  },
+                  " — 這是佇列不爆炸的三個條件"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
