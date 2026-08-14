@@ -2,7 +2,7 @@
 
 > **Type:** Explanation
 > **Audience:** Developers, AI assistants, and any tooling that needs project context
-> **Last updated:** 2026-08-13
+> **Last updated:** 2026-08-14
 >
 > How a technical concept description becomes an explainer MP4. Related docs: [motife-plan.md](../motife-plan.md).
 
@@ -16,11 +16,11 @@ Given a text description of a technical concept, produce a motion-graphic explai
 
 ### 1.2 Relationship with Other Systems
 
-Depends on an LLM provider for structured-output DSL generation and vision-based critique (vendor: TBD), a TTS provider for narration audio (vendor: TBD), and Remotion (`@remotion/renderer`, `@remotion/player`) as the sole render target.
+Depends on an LLM provider for DSL generation and vision-based critique (five interchangeable vendors via the Vercel AI SDK: Anthropic, OpenAI, Google, xAI, Groq — see [agent-pipeline.md](agent-pipeline.md)), a TTS provider for narration audio (OpenAI TTS or ElevenLabs), and Remotion (`@remotion/renderer`, `@remotion/player`) as the sole render target. A coding agent can also replace the LLM entirely ("skill mode" — `.claude/skills/motife-generate/`).
 
 ### 1.3 Deprecated / Retired or Not-Yet-Enabled Features
 
-Phase 0 hand-built a 40-second baseline composition (`JwtAuthFlow`) directly with ad-hoc primitives (`visuals.tsx`) to establish a quality bar and a primitive inventory. Phase 1 replaced those primitives with the explainer component library under `src/components/` (`Scene`, `Diagram`, `FlowPulse`, `CodeBlock`, `Terminal`, `Camera`, `StepReveal`, `Callout`, plus a design-token system) and rebuilt `JwtAuthFlow` entirely from it with hand-written props — `visuals.tsx` and the Phase 0 scenes were deleted at that point. Phase 2 added a JSON DSL and a compiler (`src/dsl/`, `src/compiler/`) that interprets a validated document at render time (no codegen step), four more semantic primitives the port required (`Stack`, `Text`, `Meter`, `StepSwitch` — see `docs/primitive-inventory.md`'s "Phase 2 outcome"), and ported all three eval-set videos (`JwtAuthFlow`, `MqBackpressure`, `DbIndexInternals`) to DSL documents under `src/dsl/docs/`. The hand-written TSX scenes (`storyboard.ts`, `sceneRegistry.tsx`, `JwtAuthFlow.tsx`, `scenes/`) were kept side by side with the DSL port only long enough to A/B them pixel-for-pixel, then deleted once the port was confirmed byte-identical — `JwtAuthFlow` (the `<Composition id>`) now means the DSL-backed version, unchanged from the reader's perspective. `ComponentGallery` stays hand-written TSX permanently: it's a component showcase, not an eval-set video, and the only place a fade transition and `CameraTarget` are render-exercised. No TTS integration or agent pipeline exists yet — narration copy and provisional scene durations live directly in each DSL document's `narration`/`durationInSeconds` fields, but narration audio is intentionally deferred until Phase 3's TTS-first timeline is implemented. A second render target (a custom Rust engine using `vello`/`skia-safe`) is explicitly deferred to Phase 5, conditional on product validation and render cost/speed becoming a bottleneck — and, per Remotion's license, would have to be a clean-room implementation against the DSL spec rather than a port of Remotion's own source (source: [motife-plan.md](../motife-plan.md) §3 Phase 5; Remotion LICENSE.md).
+Phase 0 hand-built a 40-second baseline composition (`JwtAuthFlow`) directly with ad-hoc primitives (`visuals.tsx`) to establish a quality bar and a primitive inventory. Phase 1 replaced those primitives with the explainer component library under `src/components/` (`Scene`, `Diagram`, `FlowPulse`, `CodeBlock`, `Terminal`, `Camera`, `StepReveal`, `Callout`, plus a design-token system) and rebuilt `JwtAuthFlow` entirely from it with hand-written props — `visuals.tsx` and the Phase 0 scenes were deleted at that point. Phase 2 added a JSON DSL and a compiler (`src/dsl/`, `src/compiler/`) that interprets a validated document at render time (no codegen step), four more semantic primitives the port required (`Stack`, `Text`, `Meter`, `StepSwitch` — see `docs/primitive-inventory.md`'s "Phase 2 outcome"), and ported all three eval-set videos (`JwtAuthFlow`, `MqBackpressure`, `DbIndexInternals`) to DSL documents under `src/dsl/docs/`. The hand-written TSX scenes (`storyboard.ts`, `sceneRegistry.tsx`, `JwtAuthFlow.tsx`, `scenes/`) were kept side by side with the DSL port only long enough to A/B them pixel-for-pixel, then deleted once the port was confirmed byte-identical — `JwtAuthFlow` (the `<Composition id>`) now means the DSL-backed version, unchanged from the reader's perspective. `ComponentGallery` stays hand-written TSX permanently: it's a component showcase, not an eval-set video, and the only place a fade transition and `CameraTarget` are render-exercised. Phase 3 added the agent pipeline (`src/agent/`, `src/tts/`, `src/critique/`, the `pnpm motife` CLI): prompt→DSL generation with validation-error retry, TTS-measured scene durations (backfilled into a derived `doc.tts.json` inside a run directory — the checked-in documents keep their provisional `durationInSeconds` as few-shot/regression sources), narration audio as a render-time sidecar, and a bounded render→critique→revise loop. Word-level subtitles (`@remotion/captions`) are deferred to Phase 4 polish — the existing per-scene caption band carries narration text for now. A second render target (a custom Rust engine using `vello`/`skia-safe`) is explicitly deferred to Phase 5, conditional on product validation and render cost/speed becoming a bottleneck — and, per Remotion's license, would have to be a clean-room implementation against the DSL spec rather than a port of Remotion's own source (source: [motife-plan.md](../motife-plan.md) §3 Phase 5; Remotion LICENSE.md).
 
 ## 2. Tech Stack
 
@@ -31,7 +31,9 @@ Phase 0 hand-built a 40-second baseline composition (`JwtAuthFlow`) directly wit
 - **Linter:** ESLint 9.19.0 + `@remotion/eslint-config-flat` (Remotion-specific correctness rules, e.g. `deterministic-randomness`, not just style)
 - **UI framework:** React 19.2.3
 - **Schema validation:** zod, pinned exact at `4.4.3` — the exact version `remotion`/`@remotion/cli` 4.0.508 already resolve as a peer. Defines the DSL schema (`src/dsl/schema.ts`) and its `z.infer`'d TypeScript types; `z.toJSONSchema()` is the machine-readable schema for a future structured-output LLM call.
-- **LLM vendor, TTS vendor:** TBD — not yet designed
+- **LLM access:** Vercel AI SDK (`ai` + `@ai-sdk/anthropic|openai|google|xai|groq`) — confined to the single file `src/agent/llm.ts` behind a local `LlmClient` interface; text-JSON output validated locally by `parseDocument()` (no provider structured-output modes — the recursive `$ref` schema isn't portable across all five vendors)
+- **TTS:** OpenAI TTS (`gpt-4o-mini-tts`) or ElevenLabs (`eleven_multilingual_v2`), each a single `fetch` call (`src/tts/`); durations measured with `music-metadata`
+- **Pipeline runtime:** `tsx` runs `src/agent/cli.ts` under Node (the `pnpm motife` script); secrets via Node's `--env-file-if-exists=.env`, no dotenv
 
 **Rationale:** TypeScript + Remotion was chosen so the browser's layout engine absorbs CJK text-layout risk during the current phase, rather than building that from scratch — this is the explicit reason a custom renderer is *not* built now (source: motife-plan.md §4 風險與對策). Rejected alternative: a custom Rust render engine from day one — deferred to Phase 5 until product-market validation holds and render cost or speed becomes the actual bottleneck. Package manager/linter/version choices match the official `template-helloworld` pairing (verified against its `package.json`/`tsconfig.json` at scaffold time) rather than being picked independently.
 
@@ -132,7 +134,25 @@ motife/
 └── progress/                          # development progress tracker
 ```
 
-Reserved for later phases, not yet created: `src/agent/`, `src/tts/`, `src/critique/` (Phase 3).
+Phase 3 added three pipeline packages (all plain-Node TypeScript run via `tsx`, covered by `tsc`/eslint/vitest like the rest of `src/`):
+
+```text
+├── src/agent/                         # Phase 3: the `pnpm motife` CLI + LLM-facing pipeline
+│   ├── cli.ts                         # entry point; lazy per-subcommand imports (validate works keyless)
+│   ├── commands/                      # one module per subcommand (generate, validate, tts, render,
+│   │                                   #   stills, critique, revise, run, eval)
+│   ├── llm.ts                         # the ONLY file touching the Vercel AI SDK (LlmClient interface)
+│   ├── prompt.ts / generate.ts        # system-prompt assembly; parseDocument retry loop
+│   ├── revise.ts / pipeline.ts        # critique-driven revision; the bounded full loop
+│   └── render.ts / rundir.ts          # bundle/select/render with one shared inputProps; run-dir layout
+├── src/tts/                           # Phase 3: TTS providers (fetch-only), narration-hash cache,
+│                                       #   measured-duration backfill into a DERIVED doc.tts.json
+├── src/critique/                      # Phase 3: frame selection (early/mid/late per scene),
+│                                       #   vision critique + JSON report, markdown rendering
+├── .claude/skills/motife-generate/    # skill mode: a coding agent as semantic layer + critic
+```
+
+Full CLI and run-directory contract: [agent-pipeline.md](agent-pipeline.md).
 
 ## 5. Domain Models (High-Level)
 
@@ -187,15 +207,19 @@ No network-facing interface exists yet. The current interface surface is local t
 - **`pnpm render:dsl <doc.json> <out.mp4>`** (`scripts/render-dsl.mjs`) — the zero-TypeScript render path: renders any valid DSL document through the one generic `DslPreview` composition, no baseline registration needed. This is the literal proof of motife-plan.md §3 Phase 2's exit criterion (不碰 TypeScript、只改 JSON 就能產出一支完整影片).
 - **Composition registry** — each `<Composition id="..." />` in `Root.tsx` is the stable public handle for a video. Currently five: `JwtAuthFlow`, `MqBackpressure`, `DbIndexInternals` (the eval set, all DSL-backed, registered from `src/dsl/docs/manifest.ts` with a literal `durationInFrames` computed at module scope), `ComponentGallery` (hand-written TSX, permanent), and `DslPreview` (the generic ad-hoc-document composition `render:dsl` targets, the only one using `calculateMetadata` for dynamic sizing). This `id` is what `remotion render` and `selectComposition()` address by name.
 
+- **`pnpm motife <subcommand>`** (`src/agent/cli.ts`) — the Phase 3 agent pipeline: `generate` / `validate` / `tts` / `render` / `stills` / `critique` / `revise` / `run` / `eval`. Stages communicate through a run directory under `out/runs/` — see [agent-pipeline.md](agent-pipeline.md) for the full contract.
+
 Phase 4 plans a `@remotion/player`-based web preview page (prompt in → live preview → MP4 download) (source: motife-plan.md §3 Phase 4), but that interface doesn't exist yet.
 
 ## 7. Background Jobs & Scheduled Tasks
 
-N/A — not yet designed. The render → critique → revise loop (Phase 3) will need a bounded iteration cap, but no job infrastructure has been chosen.
+No job infrastructure — the render → critique → revise loop runs in-process inside `motife run` with a bounded iteration cap (default 2 revisions after the first render, ≤3 renders total; `--max-revisions` overrides). A clean critique (zero error-severity issues) stops the loop early; an exhausted budget still ships the last render with unresolved issues recorded in `report.md`.
 
 ## 8. External Service Integrations
 
-TBD — not yet designed. Planned integration points: an LLM provider for structured-output DSL generation and vision-based critique, and a TTS provider for narration audio. Neither vendor is chosen yet.
+- **LLM providers** (generation + vision critique): Anthropic, OpenAI, Google, xAI, Groq — one `LlmClient` interface over the Vercel AI SDK, confined to `src/agent/llm.ts`. Critique defaults to Anthropic (must be vision-capable; Groq/xAI vision support is model-dependent).
+- **TTS providers**: OpenAI TTS and ElevenLabs — plain `fetch` calls in `src/tts/`, no vendor SDKs.
+- API keys and default-model selection: see [agent-pipeline.md](agent-pipeline.md) §5 and `.env.example`. `pnpm verify` requires no keys — provider construction is lazy, inside CLI handlers only.
 
 ## 9. Database / Data Stores
 
@@ -209,10 +233,11 @@ Local development only — macOS, Node ≥22, no CI yet.
 
 ### Deployment Pipeline
 
-TBD — not yet designed. Phase 4 lists deployment-shape options (open-source tool / demo site / self-use) as an explicit open decision (source: motife-plan.md §3 Phase 4). `scripts/smoke.mjs` implements the `bundle()` → `selectComposition()` → `renderStill()` pipeline (`renderMedia()` is not used there — the smoke test renders sampled stills, not video) and will be reused by Phase 3's critique loop.
+TBD — not yet designed. Phase 4 lists deployment-shape options (open-source tool / demo site / self-use) as an explicit open decision (source: motife-plan.md §3 Phase 4). `scripts/smoke.mjs` implements the `bundle()` → `selectComposition()` → `renderStill()` pipeline (`renderMedia()` is not used there — the smoke test renders sampled stills, not video); the critique loop's TypeScript sibling of that pipeline is `src/agent/render.ts`.
 
 ### Configuration Hierarchy
 
 - `remotion.config.ts` governs the Remotion CLI and Studio only (`pnpm dev`, `pnpm render`). It has **no effect** on `@remotion/renderer`'s SSR APIs.
-- Programmatic renders (`scripts/smoke.mjs`, and later the critique loop) set equivalent options directly as call arguments to `bundle()`/`renderMedia()`/`renderStill()`.
+- Programmatic renders (`scripts/smoke.mjs`, `scripts/render-dsl.mjs`, `src/agent/render.ts`) set equivalent options directly as call arguments to `bundle()`/`renderMedia()`/`renderStill()`.
+- Pipeline secrets/config live in `.env` (gitignored; template `.env.example`), loaded only by the `pnpm motife` script via `--env-file-if-exists` — no module reads `process.env` at import time, so everything but the LLM/TTS-calling subcommands works keyless.
 - These two MUST be kept in sync by hand — e.g. `remotion.config.ts` sets `Config.setRspack(true)`, and `scripts/smoke.mjs` separately passes `rspack: true` to `bundle()` to match; letting them drift means the CLI and programmatic renders silently use different bundlers.

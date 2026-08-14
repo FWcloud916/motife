@@ -1,11 +1,11 @@
 # Phase 2 — DSL + Compiler
 
 **Slug:** phase-2-dsl-compiler
-**Status:** review
+**Status:** done
 **Ticket:** N/A
 **Related plan:** [phase-2-dsl-compiler-phase-2-playful-platypus.md](../_plans/phase-2-dsl-compiler-phase-2-playful-platypus.md)
 **Created:** 2026-08-13
-**Updated:** 2026-08-13
+**Updated:** 2026-08-14
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-2/dsl-compiler` | TBD |  |
+| `motife` | `phase-2/dsl-compiler` | N/A |  |
 
 ## Background & goals
 
@@ -55,10 +55,14 @@ any schema work starts. Full design in the linked plan.
 - Stage 6: authored db-index.json (DbIndexInternals, 42s/1260 frames) — intro (query->index->row + no-index pill), breakdown (down-tree B+Tree + right-direction leaf chain side by side, both fit=contain+grow), walkthrough (first narrative Camera use: 4-step lookup track with shots focusing root/internal/leaf/table, full-bleed with a slim steps-row strip above per Camera's full-composition-frame assumption), summary (3 rules + EXPLAIN ANALYZE terminal). Found and fixed a real Stack.tsx bug along the way: unconditional minHeight:0/minWidth:0 let a non-grow Stack collapse toward zero height when siblings overflowed the container, while its text kept painting at full size past the collapsed box — visually indistinguishable from overlapping a neighbour. Fixed by scoping min-size:0 to the main axis only when grow is set; cross-axis stays 0 unconditionally. Also confirmed Camera's documented 'assumes full composition frame' constraint is load-bearing: nesting it inside a half-width card broke its pan/zoom math (useVideoConfig()-based, ignores actual containing box), fixed by giving Camera the full scene width. Verified no regression on JwtAuthFlow/MqBackpressure smoke frames. pnpm verify green (119 tests, 6 compositions smoked incl. DslPreview). All 3 eval-set videos now DSL-authored.
 - Stage 7: cutover complete. Deleted the hand-written jwt-auth/ TSX scenes (storyboard.ts, sceneRegistry.tsx, JwtAuthFlow.tsx, scenes/*.tsx) after confirming zero pixel regression (magick compare -metric AE = 0 vs v3 DSL stills). Renamed the DSL doc id JwtAuthFlowDsl -> JwtAuthFlow so the public composition id is unchanged. Moved FPS/WIDTH/HEIGHT to a new videoDefaults.ts (ComponentGallery, which stays TSX permanently, depended on storyboard.ts for these). Wrote docs/dsl-schema.md (new — the DSL document reference, written as Phase 3's system-prompt source material, worked example verified to actually parse). Updated component-library.md, project-overview.md, primitive-inventory.md, README.md, AGENTS.md, motife-plan.md (checkboxes + rewritten next-steps for Phase 3). pnpm verify green (115 tests, 5 compositions smoked). All 7 stages of the approved plan (phase-2-playful-platypus.md) are done. Ready for PR review.
 
+### 2026-08-14
+
+- PR #9 merged into main (13f3345); closing item as done.
+
 ## Outcome
 
-> Fill in after development finishes.
+Phase 2 complete: DSL schema (zod) + validator + runtime compiler shipped; all three eval videos (JWT auth, MQ backpressure, DB index internals) are DSL-authored JSON; hand-written JWT TSX scenes deleted after a pixel-identical A/B. Exit criterion met: a full video is produced by editing JSON only, zero TypeScript. Merged into main via PR #9 (commit 13f3345).
 
-**Final status:**
-**PR / Commit:**
-**Follow-ups:**
+**Final status:** done
+**PR / Commit:** PR #9 (phase-2/dsl-compiler -> main, merge commit 13f3345)
+**Follow-ups:** Phase 3 — Agent Pipeline (tracked as progress/2026-08-14-phase-3-agent-pipeline/).

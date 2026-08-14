@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Whoever writes Phase 3's system prompt; anyone hand-authoring a DSL document
-> **Last updated:** 2026-08-13
+> **Last updated:** 2026-08-14
 >
 > The Phase 2 deliverable (motife-plan.md §3 Phase 2). This doc's content is
 > literally what goes into Phase 3's system prompt — it is written for that
@@ -330,7 +330,7 @@ pasted straight into an LLM retry prompt).
 | `transition_too_long` | A scene's `transitionToNext` isn't strictly shorter than both neighbouring scenes | `scenes[1].transitionToNext ("fade", 15 frames) is not shorter than scenes[2] (12 frames) — shorten the transition or lengthen scenes[2].durationInSeconds.` |
 | `narration_pacing` (warning) | Narration length implies a pace outside ~0.3×–1.5× a comfortable ~8 chars/sec (Mandarin) | `scenes[1].narration is 128 characters but the scene is 6s — roughly 21 chars/sec, about 2.5x a comfortable pace. fix: shorten to ~50 characters, or raise durationInSeconds to about 16.` |
 
-All 20 codes above have a table-driven test in `src/compiler/validate.test.ts`
+All 20 codes above have a table-driven test in `src/compiler/parse.test.ts`
 asserting the exact code, path shape, and that `message`/`fix` contain the
 expected substrings — a new code without a matching test case is a compile
 error there (`Record<DslIssueCode, true>` exhaustiveness), not a silent gap.

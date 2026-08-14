@@ -6,15 +6,23 @@
 // never constructed or cast directly (see parse.ts's file header).
 import type { FC } from "react";
 import { useMemo } from "react";
-import { AbsoluteFill } from "remotion";
+import { AbsoluteFill, Sequence, staticFile, useVideoConfig } from "remotion";
+// CLAUDE.md hard constraint: <Audio> comes from @remotion/media, NOT from
+// "remotion" — no lint rule catches the wrong import.
+import { Audio } from "@remotion/media";
 import { SceneSeries } from "../../remotion/compositions/SceneSeries";
 import type { SceneComponentProps } from "../../remotion/compositions/SceneSeries";
 import type { DslDocument } from "../../dsl";
 import { dslTimeline } from "../timeline";
 import { DslSceneView } from "./DslSceneView";
+import type { DslAudioManifest, DslAudioManifestEntry } from "./audioManifest";
 
 export interface DslVideoProps {
   doc: DslDocument;
+  /** Narration audio sidecar (Phase 3's TTS stage). Optional: baselines
+   * and the Studio's default preview render silently without it. Keyed by
+   * scene id; scenes without an entry simply have no narration track. */
+  audio?: DslAudioManifest;
   // Remotion's <Composition> generics constrain Props to
   // Record<string, unknown> (Composition.d.ts) — an index signature here
   // is what lets DslVideoProps satisfy that constraint when used as
@@ -22,8 +30,21 @@ export interface DslVideoProps {
   [key: string]: unknown;
 }
 
-export const DslVideo: FC<DslVideoProps> = ({ doc }) => {
-  // Memoized on `doc`, and that matters beyond saving a loop: Remotion
+/** Narration for one scene, delayed by delaySeconds within the scene's own
+ * Sequence (frame 0 here is the scene's start, not the composition's). */
+const SceneNarration: FC<{ entry: DslAudioManifestEntry }> = ({ entry }) => {
+  const { fps } = useVideoConfig();
+  const from = Math.round((entry.delaySeconds ?? 0) * fps);
+  const src = /^(https?:|data:)/.test(entry.src) ? entry.src : staticFile(entry.src);
+  return (
+    <Sequence from={from}>
+      <Audio src={src} />
+    </Sequence>
+  );
+};
+
+export const DslVideo: FC<DslVideoProps> = ({ doc, audio }) => {
+  // Memoized on inputs, and that matters beyond saving a loop: Remotion
   // re-renders this component once per frame, and the per-scene wrapper
   // components below are React component TYPES. Recreating them each
   // render gives React a different function identity per frame, which
@@ -37,14 +58,18 @@ export const DslVideo: FC<DslVideoProps> = ({ doc }) => {
     // satisfies.
     const sceneComponents: Record<string, FC<SceneComponentProps>> = {};
     for (const scene of doc.scenes) {
+      const audioEntry = audio?.scenes[scene.id];
       const ScenePlayer: FC<SceneComponentProps> = ({ durationInFrames }) => (
-        <DslSceneView scene={scene} durationInFrames={durationInFrames} />
+        <>
+          {audioEntry ? <SceneNarration entry={audioEntry} /> : null}
+          <DslSceneView scene={scene} durationInFrames={durationInFrames} />
+        </>
       );
       ScenePlayer.displayName = `DslScene(${scene.id})`;
       sceneComponents[scene.id] = ScenePlayer;
     }
     return { timeline: dslTimeline(doc), components: sceneComponents };
-  }, [doc]);
+  }, [doc, audio]);
 
   return (
     <AbsoluteFill>

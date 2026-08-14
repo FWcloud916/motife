@@ -27,6 +27,7 @@ Read the matching doc **before non-trivial work**. Small fixes (typos, single-li
 | Architecture, request flow, directory layout, integrations | [docs/project-overview.md](docs/project-overview.md) |
 | Writing or editing a DSL document, adding a node type, validation errors | [docs/dsl-schema.md](docs/dsl-schema.md) |
 | Visual primitives, component API, Phase 1/2 component requirements | [docs/primitive-inventory.md](docs/primitive-inventory.md), [docs/component-library.md](docs/component-library.md) |
+| Agent pipeline (`pnpm motife`), run-directory contract, LLM/TTS providers, env vars | [docs/agent-pipeline.md](docs/agent-pipeline.md) |
 | Current development status, active work item | [progress/INDEX.md](progress/INDEX.md) |
 | Full phased roadmap, design decisions, risks | [motife-plan.md](motife-plan.md) |
 
@@ -35,15 +36,19 @@ Read the matching doc **before non-trivial work**. Small fixes (typos, single-li
 ```bash
 pnpm install    # install dependencies
 pnpm dev        # start Remotion Studio locally
-pnpm verify     # typecheck + lint + render smoke test — the verification gate for "done"
+pnpm verify     # typecheck + lint + tests + render smoke test — the verification gate for "done"
 pnpm lint       # lint only
+pnpm motife     # Phase 3 agent-pipeline CLI (generate|validate|tts|render|stills|critique|revise|run|eval)
 ```
+
+`pnpm verify` MUST pass on a machine with no `.env`/API keys — pipeline provider construction stays lazy inside CLI handlers; never read secrets at module scope.
 
 ## Conventions
 
 - Work is tracked per-task under [progress/](progress/) (progress-tracker skill), not a root `PROGRESS.md` — open or update the relevant item there before starting non-trivial work.
 - `useCurrentFrame()` is relative to the nearest enclosing `<Sequence>`, not the composition's absolute frame — a scene mounted via `<Sequence from={n}>` always sees frame 0 at its own start.
 - New videos are DSL documents, not TypeScript: add a `.json` file under `src/dsl/docs/`, register it in `src/dsl/docs/manifest.ts`'s `RAW_DOCS`, and add its frame pin to `manifest.test.ts` — `Root.tsx` registers a `<Composition>` for every entry automatically. See [docs/dsl-schema.md](docs/dsl-schema.md) for the document format. Adding a new DSL *node type* (rare) additionally needs a schema variant in `src/dsl/schema.ts`, a hand-declared type in `src/dsl/types.ts`, and a renderer in `src/compiler/render/nodes.tsx` — a missing renderer is a compile error, not a silent no-op. `ComponentGallery` (`src/remotion/compositions/gallery/`) is the one composition that stays hand-written TSX permanently.
+- Pipeline runs live under `out/runs/<name>/` (see [docs/agent-pipeline.md](docs/agent-pipeline.md)): `doc.json` is the only editable artifact there; `doc.tts.json` is derived (re-run `pnpm motife tts` after edits), and the checked-in eval docs are never TTS-rewritten — `manifest.test.ts`'s frame pins depend on it. The Vercel AI SDK is only ever imported by `src/agent/llm.ts`.
 
 ## Docs maintenance
 
