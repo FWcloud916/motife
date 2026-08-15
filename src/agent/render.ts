@@ -7,6 +7,7 @@
 // not duplicated here either: DslPreview's calculateMetadata runs
 // parseDocumentOrThrow inside the bundle; a bad doc rejects the promise.
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
 import { bundle } from "@remotion/bundler";
 import { ensureBrowser, renderMedia, renderStill, selectComposition } from "@remotion/renderer";
@@ -24,7 +25,9 @@ export interface RenderContext {
   composition: Awaited<ReturnType<typeof selectComposition>>;
 }
 
-const ENTRY_POINT = path.join(process.cwd(), "src/remotion/index.ts");
+// Resolved relative to THIS module, not process.cwd() — `motife` invoked
+// from a nested directory must still find the repo's Remotion entry.
+const ENTRY_POINT = fileURLToPath(new URL("../remotion/index.ts", import.meta.url));
 
 /**
  * Bundles once (with the run's public/ dir so staticFile() resolves the
