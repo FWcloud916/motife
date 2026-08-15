@@ -73,7 +73,8 @@ function modelFor(provider: ProviderName, modelId: string): LanguageModel {
   }
 }
 
-function toModelMessage(message: LlmMessage): ModelMessage {
+/** Exported for tests only — the pure LlmMessage → AI SDK conversion. */
+export function toModelMessage(message: LlmMessage): ModelMessage {
   if (typeof message.content === "string") {
     // The three roles all accept plain-string content; the cast is only to
     // convince TS the role/content pairing is one of the union's members.

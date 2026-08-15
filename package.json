@@ -15,11 +15,13 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:audio": "node scripts/audio-smoke.mjs",
     "render:dsl": "node scripts/render-dsl.mjs",
     "motife": "node --env-file-if-exists=.env --import tsx src/agent/cli.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "verify": "pnpm check && pnpm smoke",
+    "verify": "pnpm check && pnpm smoke && pnpm smoke:audio",
     "upgrade:remotion": "remotion upgrade"
   },
   "dependencies": {
@@ -49,6 +51,7 @@
     "@types/node": "^26.2.0",
     "@types/react": "19.2.7",
     "@types/web": "0.0.166",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "9.19.0",
     "prettier": "3.8.1",
     "tsx": "^4.23.12",

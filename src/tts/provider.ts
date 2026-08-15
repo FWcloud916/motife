@@ -17,7 +17,10 @@ export function isTtsProviderName(value: string): value is TtsProviderName {
 }
 
 export function resolveTtsProviderName(flag: string | undefined): TtsProviderName {
-  const raw = flag ?? process.env.MOTIFE_TTS ?? "openai";
+  // Empty-string env (the `.env.example` blank-value pattern) counts as
+  // unset, mirroring src/agent/providers.ts's envValue().
+  const envRaw = process.env.MOTIFE_TTS;
+  const raw = flag ?? (envRaw && envRaw.trim() !== "" ? envRaw : undefined) ?? "openai";
   if (!isTtsProviderName(raw)) {
     throw new Error(`Unknown TTS provider "${raw}" — expected one of: openai, elevenlabs.`);
   }

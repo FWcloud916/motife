@@ -35,8 +35,16 @@ export function isProviderName(value: string): value is ProviderName {
   return (PROVIDER_NAMES as readonly string[]).includes(value);
 }
 
-export function resolveProvider(flag: string | undefined, envVar = "MOTIFE_PROVIDER"): ProviderName {
-  const raw = flag ?? process.env[envVar] ?? process.env.MOTIFE_PROVIDER ?? "anthropic";
+/** An env var that is unset OR empty counts as "not configured" —
+ * .env.example ships `MOTIFE_MODEL=`-style blank lines, and `??` alone
+ * would let those empty strings through as real values. */
+function envValue(name: string): string | undefined {
+  const value = process.env[name];
+  return value === undefined || value.trim() === "" ? undefined : value;
+}
+
+export function resolveProvider(flag: string | undefined): ProviderName {
+  const raw = flag ?? envValue("MOTIFE_PROVIDER") ?? "anthropic";
   if (!isProviderName(raw)) {
     throw new Error(
       `Unknown provider "${raw}" — expected one of: ${PROVIDER_NAMES.join(", ")}.`,
@@ -46,11 +54,11 @@ export function resolveProvider(flag: string | undefined, envVar = "MOTIFE_PROVI
 }
 
 export function resolveModel(provider: ProviderName, flag: string | undefined): string {
-  return flag ?? process.env.MOTIFE_MODEL ?? DEFAULT_MODELS[provider];
+  return flag ?? envValue("MOTIFE_MODEL") ?? DEFAULT_MODELS[provider];
 }
 
 export function resolveCritiqueProvider(flag: string | undefined): ProviderName {
-  const raw = flag ?? process.env.MOTIFE_CRITIQUE_PROVIDER ?? DEFAULT_CRITIQUE_PROVIDER;
+  const raw = flag ?? envValue("MOTIFE_CRITIQUE_PROVIDER") ?? DEFAULT_CRITIQUE_PROVIDER;
   if (!isProviderName(raw)) {
     throw new Error(
       `Unknown critique provider "${raw}" — expected one of: ${PROVIDER_NAMES.join(", ")}.`,
@@ -60,5 +68,5 @@ export function resolveCritiqueProvider(flag: string | undefined): ProviderName 
 }
 
 export function resolveCritiqueModel(provider: ProviderName, flag: string | undefined): string {
-  return flag ?? process.env.MOTIFE_CRITIQUE_MODEL ?? DEFAULT_MODELS[provider];
+  return flag ?? envValue("MOTIFE_CRITIQUE_MODEL") ?? DEFAULT_MODELS[provider];
 }

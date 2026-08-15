@@ -5,7 +5,7 @@
 **Ticket:** N/A
 **Related plan:** [phase-3-agent-pipeline-silly-soaring-cherny.md](../_plans/phase-3-agent-pipeline-silly-soaring-cherny.md)
 **Created:** 2026-08-14
-**Updated:** 2026-08-14
+**Updated:** 2026-08-15
 
 ---
 
@@ -76,6 +76,24 @@ on a keyless machine.
 - PR opened: https://github.com/FWcloud916/motife/pull/10 -> status review.
   Remaining Phase 3 acceptance (needs API keys, post-merge):
   `pnpm motife eval` + human scoring per out/eval/<date>/report.md.
+
+### 2026-08-15
+
+- Coverage review follow-up (same PR): kept @vitest/coverage-v8 +
+  `pnpm test:coverage`; added `scripts/audio-smoke.mjs` (keyless
+  end-to-end narration-audio render proof — Node-synthesized WAVs, codec
+  "wav" render, PCM RMS assertions incl. delaySeconds silence; wired into
+  `pnpm verify`); pure-fn tests for providers/rundir/runInputs/llm
+  conversion; pipeline DI refactor (`runPipeline(options, stages?)`) + 7
+  control-flow tests (clean stop, revise-then-clean, budget exhaustion,
+  failed revision keeps cut, failed generation, TTS backfill, serveUrl
+  reuse).
+- Found & fixed en route: empty-string env vars from .env.example's
+  blank-value pattern leaked through `??` in provider/TTS resolution;
+  Remotion muxes CBR AAC even for silent compositions, so the audio smoke
+  asserts decoded RMS, not track presence.
+- Coverage: overall lines 44% -> 52%; src/agent statements 22% -> 76%;
+  pipeline.ts 0% -> 99%. Tests 157 -> 186.
 
 ## Outcome
 

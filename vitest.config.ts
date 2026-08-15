@@ -8,5 +8,13 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    coverage: {
+      // Scoped to src/ so scripts/ and config files don't dilute the
+      // numbers. Note the React component layer (components/**,
+      // compiler/render/*.tsx) is intentionally verified by `pnpm smoke`'s
+      // real renders + manifest.test.ts's frame pins, which coverage can't
+      // instrument — its low unit numbers here are expected, not a gap.
+      include: ["src/**"],
+    },
   },
 });

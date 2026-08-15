@@ -42,6 +42,28 @@ export interface PipelineOptions {
   log?: (line: string) => void;
 }
 
+/** The pipeline's side-effecting stage functions, injectable so the loop's
+ * control flow is unit-testable without a browser, bundler, or network.
+ * Production callers (commands/run.ts, commands/eval.ts) pass nothing and
+ * get the real implementations. */
+export interface PipelineStages {
+  buildSystemPrompt: typeof buildSystemPrompt;
+  prepareRender: typeof prepareRender;
+  renderVideo: typeof renderVideo;
+  renderCritiqueStills: typeof renderCritiqueStills;
+  runCritique: typeof runCritique;
+  synthesizeDoc: typeof synthesizeDoc;
+}
+
+const DEFAULT_STAGES: PipelineStages = {
+  buildSystemPrompt,
+  prepareRender,
+  renderVideo,
+  renderCritiqueStills,
+  runCritique,
+  synthesizeDoc,
+};
+
 export interface IterationSummary {
   iteration: number;
   errors: number;
@@ -58,11 +80,15 @@ export interface PipelineResult {
   failureText?: string;
 }
 
-export async function runPipeline(options: PipelineOptions): Promise<PipelineResult> {
+export async function runPipeline(
+  options: PipelineOptions,
+  stageOverrides: Partial<PipelineStages> = {},
+): Promise<PipelineResult> {
+  const stages = { ...DEFAULT_STAGES, ...stageOverrides };
   const log = options.log ?? (() => {});
   const maxRevisions = options.maxRevisions ?? 2;
   const paths = await ensureRunDir(options.runRoot, options.prompt);
-  const systemPrompt = await buildSystemPrompt({
+  const systemPrompt = await stages.buildSystemPrompt({
     language: options.language,
     fewShot: options.fewShot,
   });
@@ -114,7 +140,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     let audio: AudioManifest | undefined;
     if (options.ttsProvider) {
       log(`pipeline: iteration ${iteration} — tts`);
-      const tts = await synthesizeDoc({
+      const tts = await stages.synthesizeDoc({
         doc,
         provider: options.ttsProvider,
         audioDir: paths.audioDir,
@@ -132,18 +158,18 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
     }
 
     log(`pipeline: iteration ${iteration} — render`);
-    const context = await prepareRender({
+    const context = await stages.prepareRender({
       rawDoc: renderDoc,
       audio,
       publicDir: paths.publicDir,
       serveUrl,
     });
     serveUrl = context.serveUrl;
-    await renderVideo(context, iterPaths.videoMp4);
+    await stages.renderVideo(context, iterPaths.videoMp4);
     lastVideo = iterPaths.videoMp4;
 
     const renderedDoc = mustParse(renderDoc, "render input");
-    const stills = await renderCritiqueStills(
+    const stills = await stages.renderCritiqueStills(
       context,
       critiqueFrames(renderedDoc),
       iterPaths.stillsDir,
@@ -159,7 +185,7 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineRes
         mediaType: "image/jpeg",
       });
     }
-    const report = await runCritique({
+    const report = await stages.runCritique({
       client: options.critiqueClient,
       doc: renderedDoc,
       stills: stillImages,

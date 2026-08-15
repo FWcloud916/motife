@@ -38,6 +38,7 @@ pnpm install    # install dependencies
 pnpm dev        # start Remotion Studio locally
 pnpm verify     # typecheck + lint + tests + render smoke test — the verification gate for "done"
 pnpm lint       # lint only
+pnpm test:coverage  # unit-test coverage (src/ only; component layer is smoke/frame-pin verified)
 pnpm motife     # Phase 3 agent-pipeline CLI (generate|validate|tts|render|stills|critique|revise|run|eval)
 ```
 
