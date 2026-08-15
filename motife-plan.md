@@ -138,14 +138,13 @@ Prompt(概念描述)
 
 ## 6. 立即下一步
 
-Phase 0/1/2 皆已完成並驗收。Phase 3 的實作已全數落地(`pnpm motife` CLI:
-generate / validate / tts / render / stills / critique / revise / run /
-eval,見 `docs/agent-pipeline.md`;多供應商 LLM 走 Vercel AI SDK、TTS 支援
-OpenAI 與 ElevenLabs、另有 coding agent 直接驅動的 skill 模式
-`.claude/skills/motife-generate/`)。剩餘的 Phase 3 驗收步驟:
+Phase 0/1/2/3 皆已完成並驗收(見上方各 Phase 勾選項與驗收說明)。下一步是
+Phase 4 — 打磨與發布,優先順序依驗收記錄的失敗模式:
 
-1. 設定 `.env`(照 `.env.example`;至少一家 LLM key + TTS key)
-2. `pnpm motife eval` — 3 個 eval 概念全自動跑一輪(每支影片:
-   prompt → DSL → TTS → render → critique → ≤2 輪修訂)
-3. 依 `out/eval/<date>/report.md` 的評分表人工評分;通過即勾掉上方
-   Phase 3 的驗收項,失敗模式回饋進 Phase 4 的待辦
+1. **確定性修復三個已知失敗模式**(改元件/compiler,不改 prompt):
+   Diagram 節點卡片溢出畫面(db-index critique 循環無法收斂的主因)、
+   Camera 運鏡超出範圍、TTS 中文旁白口音(評估 OpenAI 其他 voice/model
+   與 ElevenLabs)
+2. 用 10+ 個新概念(不在 eval set 內)壓力測試,收集更多失敗模式
+3. `@remotion/player` 網頁預覽頁(prompt → 線上預覽 → 下載 MP4)
+4. 決定發布形式(開源工具 / demo 網站 / 內容創作自用)
