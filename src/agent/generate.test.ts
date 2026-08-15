@@ -67,6 +67,14 @@ describe("generateDsl", () => {
     expect(client.calls[0].messages.map((m) => m.role)).toEqual(["system", "user"]);
   });
 
+  it("strips prose around the JSON object (prefix and suffix)", async () => {
+    const client = new FakeLlmClient([
+      "Here is the document:\n" + JSON.stringify(VALID_DOC) + "\nHope that helps!",
+    ]);
+    const result = await generateDsl({ client, systemPrompt: SYSTEM, userPrompt: PROMPT });
+    expect(result.ok).toBe(true);
+  });
+
   it("strips markdown fences before parsing", async () => {
     const client = new FakeLlmClient(["```json\n" + JSON.stringify(VALID_DOC) + "\n```"]);
     const result = await generateDsl({ client, systemPrompt: SYSTEM, userPrompt: PROMPT });

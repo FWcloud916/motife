@@ -114,6 +114,14 @@ export function parseCritiqueReport(text: string): ParseCritiqueResult {
   return { ok: true, report: result.data };
 }
 
+/** Drops issues whose sceneId does not exist in the document — a
+ * hallucinated scene would otherwise flow into critique.md and the
+ * revision prompt as a confident instruction about nothing. */
+function withKnownScenes(report: CritiqueReport, doc: DslDocument): CritiqueReport {
+  const known = new Set(doc.scenes.map((scene) => scene.id));
+  return { issues: report.issues.filter((issue) => known.has(issue.sceneId)) };
+}
+
 export async function runCritique(options: {
   client: LlmClient;
   doc: DslDocument;
@@ -122,7 +130,7 @@ export async function runCritique(options: {
   const messages = buildCritiqueMessages(options.doc, options.stills);
   const first = await options.client.complete({ messages });
   const parsed = parseCritiqueReport(first.text);
-  if (parsed.ok) return parsed.report;
+  if (parsed.ok) return withKnownScenes(parsed.report, options.doc);
 
   // One repair retry: the model sees its own output and the parse error.
   const retry = await options.client.complete({
@@ -139,5 +147,5 @@ export async function runCritique(options: {
   if (!reparsed.ok) {
     throw new Error(`critique: model never produced a parseable report — ${reparsed.error}`);
   }
-  return reparsed.report;
+  return withKnownScenes(reparsed.report, options.doc);
 }

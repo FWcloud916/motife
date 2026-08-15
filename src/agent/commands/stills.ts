@@ -8,6 +8,7 @@ import { critiqueFrames } from "../../critique/frames";
 import { prepareRender, renderCritiqueStills } from "../render";
 import { loadRunInputs } from "../runInputs";
 import { iterationPaths, runPaths } from "../rundir";
+import { OptionError, integerOption } from "./optionValues";
 
 const USAGE = `usage: pnpm motife stills [doc.json] --run <dir> [options]
 
@@ -44,10 +45,25 @@ export async function run(argv: string[]): Promise<number> {
     console.error(`motife stills: --run <dir> is required\n\n${USAGE}`);
     return 2;
   }
-  const iteration = args.values.iter === undefined ? 1 : Number(args.values.iter);
+  let iteration: number;
+  try {
+    iteration = integerOption("--iter", args.values.iter, { min: 1, fallback: 1 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife stills: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
 
   const paths = runPaths(runRoot);
-  const inputs = await loadRunInputs(runRoot, args.positionals[0]);
+  let inputs;
+  try {
+    inputs = await loadRunInputs(runRoot, args.positionals[0]);
+  } catch (err) {
+    console.error(`motife stills: cannot load run inputs from ${runRoot}: ${(err as Error).message}`);
+    return 2;
+  }
 
   const parsed = parseDocument(inputs.rawDoc);
   if (!parsed.ok) {

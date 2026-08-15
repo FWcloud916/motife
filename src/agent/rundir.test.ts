@@ -24,17 +24,23 @@ describe("slugify", () => {
 describe("defaultRunRoot", () => {
   const now = new Date(2026, 7, 15, 9, 5, 7); // 2026-08-15 09:05:07 local
 
-  it("stamps date+time and the slug", () => {
-    expect(defaultRunRoot("Explain JWT", now)).toBe(
-      path.join("out", "runs", "20260815-090507-explain-jwt"),
+  function basename(root: string): string {
+    return root.split(path.sep).pop() ?? "";
+  }
+
+  it("stamps date+time, a collision nonce, and the slug", () => {
+    expect(basename(defaultRunRoot("Explain JWT", now))).toMatch(
+      /^20260815-090507-[0-9a-f]{4}-explain-jwt$/,
     );
   });
 
-  it("falls back to 'run' when the slug is empty (CJK prompts)", () => {
-    expect(defaultRunRoot("解釋 JWT", now)).toBe(
-      path.join("out", "runs", "20260815-090507-jwt"),
-    );
-    expect(defaultRunRoot("解釋索引", now)).toBe(path.join("out", "runs", "20260815-090507-run"));
+  it("stays nonce-only when the slug is empty (CJK prompts)", () => {
+    expect(basename(defaultRunRoot("解釋 JWT", now))).toMatch(/^20260815-090507-[0-9a-f]{4}-jwt$/);
+    expect(basename(defaultRunRoot("解釋索引", now))).toMatch(/^20260815-090507-[0-9a-f]{4}$/);
+  });
+
+  it("gives two same-second runs with the same prompt distinct roots", () => {
+    expect(defaultRunRoot("Explain JWT", now)).not.toBe(defaultRunRoot("Explain JWT", now));
   });
 });
 

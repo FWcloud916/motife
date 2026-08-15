@@ -11,9 +11,8 @@ import {
 } from "../providers";
 import { runPipeline } from "../pipeline";
 import { defaultRunRoot } from "../rundir";
-import { createOpenAiTts } from "../../tts/openai";
-import { createElevenLabsTts } from "../../tts/elevenlabs";
-import { resolveTtsProviderName } from "../../tts/provider";
+import { OptionError, integerOption } from "./optionValues";
+import { createTtsProvider } from "../../tts/provider";
 import type { TtsProvider } from "../../tts/provider";
 
 const USAGE = `usage: pnpm motife run --prompt "<concept>" [options]
@@ -65,19 +64,25 @@ export async function run(argv: string[]): Promise<number> {
     return 2;
   }
 
+  let maxRevisions: number | undefined;
+  try {
+    maxRevisions = integerOption("--max-revisions", args.values["max-revisions"], { min: 0 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife run: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
+
   const provider = resolveProvider(args.values.provider);
   const model = resolveModel(provider, args.values.model);
   const critiqueProvider = resolveCritiqueProvider(args.values["critique-provider"]);
   const critiqueModel = resolveCritiqueModel(critiqueProvider, args.values["critique-model"]);
 
-  let ttsProvider: TtsProvider | null = null;
-  if (!args.values["no-audio"]) {
-    const ttsName = resolveTtsProviderName(args.values.tts);
-    ttsProvider =
-      ttsName === "openai"
-        ? createOpenAiTts({ voice: args.values.voice })
-        : createElevenLabsTts({ voice: args.values.voice });
-  }
+  const ttsProvider: TtsProvider | null = args.values["no-audio"]
+    ? null
+    : createTtsProvider({ flag: args.values.tts, voice: args.values.voice });
 
   const runRoot = args.values.run ?? defaultRunRoot(prompt);
   console.log(`run directory: ${runRoot}`);
@@ -91,10 +96,7 @@ export async function run(argv: string[]): Promise<number> {
     critiqueClient: createLlmClient({ provider: critiqueProvider, model: critiqueModel }),
     ttsProvider,
     language: args.values.lang,
-    maxRevisions:
-      args.values["max-revisions"] === undefined
-        ? undefined
-        : Number(args.values["max-revisions"]),
+    maxRevisions,
     log: (line) => console.log(line),
   });
 

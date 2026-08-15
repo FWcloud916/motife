@@ -110,7 +110,14 @@ export async function runPipeline(
     },
   });
   if (!generated.ok) {
-    await writeReport(paths.reportMd, options.prompt, generated.attempts.length, [], false, false);
+    await writeReport(
+      paths.reportMd,
+      options.prompt,
+      generated.attempts.length,
+      [],
+      "generation-failed",
+      false,
+    );
     return {
       ok: false,
       finalMp4: null,
@@ -128,7 +135,13 @@ export async function runPipeline(
   const summaries: IterationSummary[] = [];
   let lastVideo: string | null = null;
   let clean = false;
+  let outcome: RunOutcome = "aborted";
 
+  // try/finally, not try/catch: a stage that throws still aborts the run
+  // (the caller sees the rejection), but the run directory keeps its
+  // promise of being resumable by hand — the last finished render is
+  // copied to final.mp4 and report.md records how far the run got.
+  try {
   for (let iteration = 1; iteration <= maxRevisions + 1; iteration++) {
     const iterPaths = iterationPaths(options.runRoot, iteration);
     const rawText = await readFile(paths.docJson, "utf8");
@@ -137,6 +150,7 @@ export async function runPipeline(
 
     // TTS (cache makes re-runs cheap; only changed narration re-synthesizes).
     let renderDoc: unknown = rawDoc;
+    let renderedDoc = doc;
     let audio: AudioManifest | undefined;
     if (options.ttsProvider) {
       log(`pipeline: iteration ${iteration} — tts`);
@@ -153,7 +167,7 @@ export async function runPipeline(
         leadSeconds: options.ttsLeadSeconds,
         tailSeconds: options.ttsTailSeconds,
       });
-      mustParse(renderDoc, "doc.tts.json (derived)");
+      renderedDoc = mustParse(renderDoc, "doc.tts.json (derived)");
       await writeFile(paths.docTtsJson, `${JSON.stringify(renderDoc, null, 2)}\n`, "utf8");
     }
 
@@ -168,7 +182,6 @@ export async function runPipeline(
     await stages.renderVideo(context, iterPaths.videoMp4);
     lastVideo = iterPaths.videoMp4;
 
-    const renderedDoc = mustParse(renderDoc, "render input");
     const stills = await stages.renderCritiqueStills(
       context,
       critiqueFrames(renderedDoc),
@@ -200,9 +213,13 @@ export async function runPipeline(
 
     if (errors === 0) {
       clean = true;
+      outcome = "clean";
       break;
     }
-    if (iteration > maxRevisions) break;
+    if (iteration > maxRevisions) {
+      outcome = "exhausted";
+      break;
+    }
 
     log(`pipeline: iteration ${iteration} — revising`);
     const revised = await reviseDsl({
@@ -221,21 +238,23 @@ export async function runPipeline(
     if (!revised.ok) {
       // A failed revision is not a failed run — ship the current render.
       log("pipeline: revision failed validation repeatedly — keeping current cut");
+      outcome = "revision-failed";
       break;
     }
     await copyFile(paths.docJson, path.join(iterPaths.root, "doc.before.json"));
     await writeFile(paths.docJson, `${revised.json}\n`, "utf8");
   }
-
-  if (lastVideo) await copyFile(lastVideo, paths.finalMp4);
-  await writeReport(
-    paths.reportMd,
-    options.prompt,
-    generated.attempts.length,
-    summaries,
-    clean,
-    lastVideo !== null,
-  );
+  } finally {
+    if (lastVideo) await copyFile(lastVideo, paths.finalMp4);
+    await writeReport(
+      paths.reportMd,
+      options.prompt,
+      generated.attempts.length,
+      summaries,
+      outcome,
+      lastVideo !== null,
+    );
+  }
   return {
     ok: lastVideo !== null,
     finalMp4: lastVideo ? paths.finalMp4 : null,
@@ -253,12 +272,25 @@ function mustParse(input: unknown, label: string): DslDocument {
   return result.doc;
 }
 
+type RunOutcome = "clean" | "exhausted" | "revision-failed" | "aborted" | "generation-failed";
+
+const OUTCOME_NOTES: Record<RunOutcome, string> = {
+  clean: "Final render passed critique with zero errors.",
+  exhausted:
+    "Revision budget exhausted — final.mp4 is the last render; unresolved issues are in the last iteration's critique.md.",
+  "revision-failed":
+    "Revision never passed validation — final.mp4 is the last render; the critique it did not absorb is in the last iteration's critique.md.",
+  aborted:
+    "Run aborted by an error mid-iteration — final.mp4 (when present) is the last COMPLETED render; the run directory is resumable by hand.",
+  "generation-failed": "Run failed before rendering.",
+};
+
 async function writeReport(
   reportPath: string,
   prompt: string,
   generateAttempts: number,
   iterations: IterationSummary[],
-  clean: boolean,
+  outcome: RunOutcome,
   rendered: boolean,
 ): Promise<void> {
   const lines = [
@@ -274,13 +306,6 @@ async function writeReport(
         `${summary.warnings} warning(s) — see iterations/iter-${summary.iteration}/critique.md`,
     );
   }
-  lines.push(
-    "",
-    rendered
-      ? clean
-        ? "Final render passed critique with zero errors."
-        : "Revision budget exhausted — final.mp4 is the last render; unresolved issues are in the last iteration's critique.md."
-      : "Run failed before rendering.",
-  );
+  lines.push("", OUTCOME_NOTES[outcome]);
   await writeFile(reportPath, `${lines.join("\n")}\n`, "utf8");
 }

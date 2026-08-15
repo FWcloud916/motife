@@ -2,7 +2,7 @@
 
 > **Type:** Explanation
 > **Audience:** Developers, AI assistants, and any tooling that needs project context
-> **Last updated:** 2026-08-14
+> **Last updated:** 2026-08-15
 >
 > How a technical concept description becomes an explainer MP4. Related docs: [motife-plan.md](../motife-plan.md).
 
@@ -26,7 +26,7 @@ Phase 0 hand-built a 40-second baseline composition (`JwtAuthFlow`) directly wit
 
 - **Language:** TypeScript 5.9.3 (source: [motife-plan.md](../motife-plan.md) §2)
 - **Render engine:** Remotion, pinned exact at `4.0.508` — the single render target; also provides `@remotion/player` for web embedding (source: motife-plan.md §1). All `remotion`/`@remotion/*` packages are kept at the identical exact version (no caret ranges); add new ones with `npx remotion add <pkg>`.
-- **Runtime:** Node ≥22 (source: `.nvmrc`, `package.json` engines)
+- **Runtime:** Node ≥22.9 (source: `package.json` engines — `--env-file-if-exists`, used by the `motife` script, was added in Node v22.9.0; `.nvmrc` pins the 22 line)
 - **Package manager:** pnpm 11.8.0
 - **Linter:** ESLint 9.19.0 + `@remotion/eslint-config-flat` (Remotion-specific correctness rules, e.g. `deterministic-randomness`, not just style)
 - **UI framework:** React 19.2.3
@@ -229,7 +229,7 @@ N/A — the project's current design has no server-side datastore; the pipeline 
 
 ### Environments
 
-Local development only — macOS, Node ≥22, no CI yet.
+Local development only — macOS, Node ≥22.9, no CI yet.
 
 ### Deployment Pipeline
 

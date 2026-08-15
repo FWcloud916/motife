@@ -21,6 +21,12 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("zh-TW");
   });
 
+  it("rejects a non-integer fewShot instead of silently dropping all examples", async () => {
+    await expect(buildSystemPrompt({ fewShot: Number.NaN })).rejects.toThrow(
+      /fewShot must be an integer/,
+    );
+  });
+
   it("honors language and few-shot overrides", async () => {
     const prompt = await buildSystemPrompt({ language: "en-US", fewShot: 0 });
     expect(prompt).toContain("en-US");

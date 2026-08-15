@@ -15,9 +15,8 @@ import {
 import type { PipelineResult } from "../pipeline";
 import { runPipeline } from "../pipeline";
 import { EVAL_CONCEPTS } from "../evalConcepts";
-import { createOpenAiTts } from "../../tts/openai";
-import { createElevenLabsTts } from "../../tts/elevenlabs";
-import { resolveTtsProviderName } from "../../tts/provider";
+import { OptionError, integerOption } from "./optionValues";
+import { createTtsProvider } from "../../tts/provider";
 import type { TtsProvider } from "../../tts/provider";
 
 const USAGE = `usage: pnpm motife eval [options]
@@ -74,6 +73,17 @@ export async function run(argv: string[]): Promise<number> {
     return 2;
   }
 
+  let maxRevisions: number | undefined;
+  try {
+    maxRevisions = integerOption("--max-revisions", args.values["max-revisions"], { min: 0 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife eval: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
+
   const provider = resolveProvider(args.values.provider);
   const model = resolveModel(provider, args.values.model);
   const critiqueProvider = resolveCritiqueProvider(args.values["critique-provider"]);
@@ -94,14 +104,9 @@ export async function run(argv: string[]): Promise<number> {
   for (const concept of concepts) {
     console.log(`\n=== eval: ${concept.slug} — ${concept.title} ===`);
     // A fresh TTS provider per concept keeps voice/env resolution simple.
-    let ttsProvider: TtsProvider | null = null;
-    if (!args.values["no-audio"]) {
-      const ttsName = resolveTtsProviderName(args.values.tts);
-      ttsProvider =
-        ttsName === "openai"
-          ? createOpenAiTts({ voice: args.values.voice })
-          : createElevenLabsTts({ voice: args.values.voice });
-    }
+    const ttsProvider: TtsProvider | null = args.values["no-audio"]
+      ? null
+      : createTtsProvider({ flag: args.values.tts, voice: args.values.voice });
 
     const started = Date.now();
     try {
@@ -112,10 +117,7 @@ export async function run(argv: string[]): Promise<number> {
         critiqueClient: createLlmClient({ provider: critiqueProvider, model: critiqueModel }),
         ttsProvider,
         language: args.values.lang,
-        maxRevisions:
-          args.values["max-revisions"] === undefined
-            ? undefined
-            : Number(args.values["max-revisions"]),
+        maxRevisions,
         log: (line) => console.log(line),
       });
       results.push({

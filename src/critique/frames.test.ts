@@ -28,6 +28,28 @@ describe("critiqueFrames", () => {
     expect(critiqueFrames(JWT_DOC)).toEqual(critiqueFrames(JWT_DOC));
   });
 
+  it("keeps labels temporally ordered on ~1s scenes (late never precedes mid)", () => {
+    const doc = parseDocumentOrThrow({
+      version: 1,
+      id: "OneSecondScenes",
+      title: "Short",
+      scenes: ["intro", "breakdown", "walkthrough", "summary"].map((id) => ({
+        id,
+        beat: id,
+        durationInSeconds: 1, // 30 frames: late's backoff would land before mid
+        narration: "A short line.",
+        content: { type: "pill", text: id },
+      })),
+    });
+
+    for (const sceneId of ["intro", "breakdown", "walkthrough", "summary"]) {
+      const sceneFrames = critiqueFrames(doc).filter((frame) => frame.sceneId === sceneId);
+      for (let i = 1; i < sceneFrames.length; i++) {
+        expect(sceneFrames[i].frame).toBeGreaterThan(sceneFrames[i - 1].frame);
+      }
+    }
+  });
+
   it("collapses duplicate frames on very short scenes instead of repeating them", () => {
     const doc = parseDocumentOrThrow({
       version: 1,

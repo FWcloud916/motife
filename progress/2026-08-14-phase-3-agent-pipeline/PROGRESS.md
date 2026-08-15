@@ -95,6 +95,17 @@ on a keyless machine.
 - Coverage: overall lines 44% -> 52%; src/agent statements 22% -> 76%;
   pipeline.ts 0% -> 99%. Tests 157 -> 186.
 
+- CodeRabbit review round (12 actionable + 4 nitpicks; 15 adopted, docs-date
+  partially): Groq default -> openai/gpt-oss-120b (llama-3.3 shutdown
+  2026-08-16); engines.node >=22.9 (--env-file-if-exists floor); shared
+  integerOption/numberOption validation across all 7 numeric CLI options;
+  guarded I/O in tts/revise (+render/stills, same class); coerceJsonText
+  suffix-prose strip; frames late>=mid clamp; prompt fewShot NaN guard;
+  fakeLlm request snapshots; defaultRunRoot collision nonce; pipeline
+  try/finally (report + final.mp4 survive stage crashes) with a proper
+  outcome enum (clean/exhausted/revision-failed/aborted); critique drops
+  hallucinated sceneIds; createTtsProvider dedup. 192 tests, verify green.
+
 ## Outcome
 
 > Fill in after development finishes.

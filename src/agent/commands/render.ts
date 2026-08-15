@@ -43,7 +43,13 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const paths = runPaths(runRoot);
-  const inputs = await loadRunInputs(runRoot, args.positionals[0]);
+  let inputs;
+  try {
+    inputs = await loadRunInputs(runRoot, args.positionals[0]);
+  } catch (err) {
+    console.error(`motife render: cannot load run inputs from ${runRoot}: ${(err as Error).message}`);
+    return 2;
+  }
   const outPath = args.values.out ?? paths.finalMp4;
 
   console.log(`render: ${inputs.docPath}${inputs.audio ? " + narration audio" : " (no audio)"}`);

@@ -2,6 +2,7 @@
 // API mode and skill mode, which share it byte-for-byte). Everything a run
 // produces lives under out/runs/<name>/; checked-in sources are never
 // touched (the eval docs stay pristine — manifest.test.ts pins depend on it).
+import { randomBytes } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -79,8 +80,12 @@ export function defaultRunRoot(prompt: string, now = new Date()): string {
     String(now.getMinutes()).padStart(2, "0"),
     String(now.getSeconds()).padStart(2, "0"),
   ].join("");
+  // Second-resolution timestamps collide when two runs launch at once and
+  // ensureRunDir() would then silently share artifacts — a short random
+  // suffix keeps every default root unique.
+  const nonce = randomBytes(2).toString("hex");
   const slug = slugify(prompt);
-  const name = slug.length > 0 ? `${stamp}-${time}-${slug}` : `${stamp}-${time}-run`;
+  const name = `${stamp}-${time}-${nonce}${slug.length > 0 ? `-${slug}` : ""}`;
   return path.join("out", "runs", name);
 }
 

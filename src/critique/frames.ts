@@ -28,10 +28,14 @@ export function critiqueFrames(doc: DslDocument): CritiqueFrame[] {
   const frames: CritiqueFrame[] = [];
   for (const entry of dslTimeline(doc)) {
     const last = entry.from + entry.durationInFrames - 1;
+    const mid = entry.from + Math.floor(entry.durationInFrames / 2);
     const candidates: Record<CritiqueFrameLabel, number> = {
       early: entry.from + Math.min(EARLY_OFFSET_FRAMES, Math.floor(entry.durationInFrames / 4)),
-      mid: entry.from + Math.floor(entry.durationInFrames / 2),
-      late: Math.max(entry.from, last - LATE_BACKOFF_FRAMES),
+      mid,
+      // Clamped to `mid`, not just the scene start: on a ~1s scene the
+      // backoff would otherwise land "late" BEFORE "mid", and that wrong
+      // temporal label flows into the vision prompt.
+      late: Math.max(mid, last - LATE_BACKOFF_FRAMES),
     };
     const seen = new Set<number>();
     for (const label of ["early", "mid", "late"] as const) {

@@ -23,7 +23,12 @@ export interface PromptOptions {
 
 export async function buildSystemPrompt(options: PromptOptions = {}): Promise<string> {
   const language = options.language ?? "zh-TW";
-  const fewShotCount = Math.max(0, Math.min(options.fewShot ?? RAW_DOCS.length, RAW_DOCS.length));
+  const requestedFewShot = options.fewShot ?? RAW_DOCS.length;
+  if (!Number.isInteger(requestedFewShot)) {
+    // NaN would silently clamp to zero examples — fail loudly instead.
+    throw new Error(`fewShot must be an integer (got ${String(requestedFewShot)}).`);
+  }
+  const fewShotCount = Math.max(0, Math.min(requestedFewShot, RAW_DOCS.length));
 
   const specMarkdown = await readFile(fileURLToPath(DSL_SCHEMA_DOC_URL), "utf8");
   const jsonSchema = JSON.stringify(z.toJSONSchema(dslDocumentSchema));

@@ -15,7 +15,9 @@ export const DEFAULT_MODELS: Record<ProviderName, string> = {
   openai: "gpt-5.1",
   google: "gemini-2.5-flash",
   xai: "grok-4",
-  groq: "llama-3.3-70b-versatile",
+  // llama-3.3-70b-versatile was shut down by Groq on 2026-08-16; this is
+  // their recommended replacement.
+  groq: "openai/gpt-oss-120b",
 };
 
 /** Env var each provider's AI SDK package reads its API key from. */

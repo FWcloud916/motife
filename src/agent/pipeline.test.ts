@@ -196,6 +196,35 @@ describe("runPipeline", () => {
     // doc.json still the original.
     expect(await readFile(path.join(dir, "run", "doc.json"), "utf8")).not.toContain("revised");
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
+    // The report says what actually happened — not "budget exhausted".
+    expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
+      "Revision never passed validation",
+    );
+  });
+
+  it("still writes the report and final.mp4 when a stage throws mid-iteration", async () => {
+    const { stages } = fakeStages([HAS_ERROR]);
+    const client = new FakeLlmClient([JSON.stringify(VALID_DOC), JSON.stringify(REVISED_DOC)]);
+    // Iteration 1 renders fine; iteration 2's render blows up.
+    let renders = 0;
+    const throwingStages = {
+      ...stages,
+      renderVideo: async (context: Parameters<NonNullable<typeof stages.renderVideo>>[0], out: string) => {
+        renders++;
+        if (renders === 2) throw new Error("browser crashed");
+        await stages.renderVideo!(context, out);
+      },
+    };
+
+    await expect(runPipeline(baseOptions(client), throwingStages)).rejects.toThrow(
+      "browser crashed",
+    );
+
+    // The run directory still keeps its resumable-by-hand promise.
+    expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
+    const report = await readFile(path.join(dir, "run", "report.md"), "utf8");
+    expect(report).toContain("Run aborted by an error");
+    expect(report).toContain("iteration 1: 1 error(s)");
   });
 
   it("fails the run (no render) when generation never validates", async () => {

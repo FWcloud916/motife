@@ -11,6 +11,7 @@ import { resolveModel, resolveProvider } from "../providers";
 import { buildSystemPrompt } from "../prompt";
 import { reviseDsl } from "../revise";
 import { iterationPaths, runPaths } from "../rundir";
+import { OptionError, integerOption } from "./optionValues";
 
 const USAGE = `usage: pnpm motife revise --run <dir> [options]
 
@@ -52,7 +53,16 @@ export async function run(argv: string[]): Promise<number> {
     console.error(`motife revise: --run <dir> is required\n\n${USAGE}`);
     return 2;
   }
-  const iteration = args.values.iter === undefined ? 1 : Number(args.values.iter);
+  let iteration: number;
+  try {
+    iteration = integerOption("--iter", args.values.iter, { min: 1, fallback: 1 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife revise: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
   const paths = runPaths(runRoot);
   const iterPaths = iterationPaths(runRoot, iteration);
 
@@ -66,7 +76,16 @@ export async function run(argv: string[]): Promise<number> {
     );
     return 2;
   }
-  const rawDocJson = await readFile(paths.docJson, "utf8");
+  let rawDocJson: string;
+  try {
+    rawDocJson = await readFile(paths.docJson, "utf8");
+  } catch (err) {
+    console.error(
+      `motife revise: cannot read ${paths.docJson}: ${(err as Error).message} — ` +
+        `run \`motife generate\` (or place a doc.json in the run directory) first.`,
+    );
+    return 2;
+  }
 
   const provider = resolveProvider(args.values.provider);
   const model = resolveModel(provider, args.values.model);

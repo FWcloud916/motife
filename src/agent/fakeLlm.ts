@@ -13,7 +13,9 @@ export class FakeLlmClient implements LlmClient {
   }
 
   async complete(req: LlmRequest): Promise<{ text: string }> {
-    this.calls.push(req);
+    // Snapshot: generateDsl keeps appending retry turns to the SAME
+    // messages array, so storing the reference would rewrite history.
+    this.calls.push({ ...req, messages: [...req.messages] });
     const index = this.calls.length - 1;
     const text = this.responses[index];
     if (text === undefined) {

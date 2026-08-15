@@ -10,7 +10,9 @@ export function coerceJsonText(raw: string): string {
   let text = raw.trim();
   const fenced = /^```[a-zA-Z]*\s*\n([\s\S]*?)\n?```\s*$/.exec(text);
   if (fenced) text = fenced[1].trim();
-  if (!text.startsWith("{")) {
+  // Trim prose on EITHER side of the object — "Here you go: {...}" and
+  // "{...}\nHope that helps!" both appear in the wild.
+  if (!text.startsWith("{") || !text.endsWith("}")) {
     const first = text.indexOf("{");
     const last = text.lastIndexOf("}");
     if (first !== -1 && last > first) text = text.slice(first, last + 1);

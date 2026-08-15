@@ -115,6 +115,25 @@ describe("runCritique", () => {
     expect(client.calls).toHaveLength(1);
   });
 
+  it("drops issues for scenes the document does not have", async () => {
+    const withGhost = JSON.stringify({
+      issues: [
+        ...JSON.parse(VALID_REPORT).issues,
+        {
+          sceneId: "hallucinated-scene",
+          severity: "error",
+          kind: "overlap",
+          description: "Ghost issue.",
+          suggestion: "Should never reach the revision prompt.",
+        },
+      ],
+    });
+    const client = new FakeLlmClient([withGhost]);
+    const report = await runCritique({ client, doc: DOC, stills: STILLS });
+    expect(report.issues).toHaveLength(1);
+    expect(report.issues[0].sceneId).toBe("intro");
+  });
+
   it("retries once with the parse error, then gives up", async () => {
     const client = new FakeLlmClient(["not json", VALID_REPORT]);
     const report = await runCritique({ client, doc: DOC, stills: STILLS });

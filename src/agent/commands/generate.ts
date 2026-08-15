@@ -9,6 +9,7 @@ import { resolveModel, resolveProvider } from "../providers";
 import { buildSystemPrompt } from "../prompt";
 import { generateDsl } from "../generate";
 import { defaultRunRoot, ensureRunDir } from "../rundir";
+import { OptionError, integerOption } from "./optionValues";
 
 const USAGE = `usage: pnpm motife generate --prompt "<concept>" [options]
 
@@ -51,13 +52,26 @@ export async function run(argv: string[]): Promise<number> {
     return 2;
   }
 
+  let fewShot: number | undefined;
+  let maxAttempts: number | undefined;
+  try {
+    fewShot = integerOption("--few-shot", args.values["few-shot"], { min: 0, max: 3 });
+    maxAttempts = integerOption("--max-attempts", args.values["max-attempts"], { min: 1 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife generate: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
+
   const provider = resolveProvider(args.values.provider);
   const model = resolveModel(provider, args.values.model);
   const client = createLlmClient({ provider, model });
 
   const systemPrompt = await buildSystemPrompt({
     language: args.values.lang,
-    fewShot: args.values["few-shot"] === undefined ? undefined : Number(args.values["few-shot"]),
+    fewShot,
   });
 
   const runRoot = args.values.run ?? defaultRunRoot(prompt);
@@ -69,8 +83,7 @@ export async function run(argv: string[]): Promise<number> {
     client,
     systemPrompt,
     userPrompt: prompt,
-    maxAttempts:
-      args.values["max-attempts"] === undefined ? undefined : Number(args.values["max-attempts"]),
+    maxAttempts,
     onAttempt: async (record) => {
       const stem = path.join(paths.attemptsDir, String(record.attempt).padStart(2, "0"));
       await writeFile(`${stem}.dsl.json`, record.raw, "utf8");

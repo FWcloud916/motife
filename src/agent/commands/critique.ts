@@ -14,6 +14,7 @@ import { resolveCritiqueModel, resolveCritiqueProvider } from "../providers";
 import { stillFileName } from "../render";
 import { loadRunInputs } from "../runInputs";
 import { iterationPaths } from "../rundir";
+import { OptionError, integerOption } from "./optionValues";
 
 const USAGE = `usage: pnpm motife critique --run <dir> [options]
 
@@ -52,7 +53,16 @@ export async function run(argv: string[]): Promise<number> {
     console.error(`motife critique: --run <dir> is required\n\n${USAGE}`);
     return 2;
   }
-  const iteration = args.values.iter === undefined ? 1 : Number(args.values.iter);
+  let iteration: number;
+  try {
+    iteration = integerOption("--iter", args.values.iter, { min: 1, fallback: 1 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife critique: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
   const iterPaths = iterationPaths(runRoot, iteration);
 
   const inputs = await loadRunInputs(runRoot);

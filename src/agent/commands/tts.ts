@@ -7,11 +7,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import { formatIssues, parseDocument } from "../../compiler";
 import { backfillDurations } from "../../tts/backfill";
 import { synthesizeDoc } from "../../tts/synthesize";
-import { createOpenAiTts } from "../../tts/openai";
-import { createElevenLabsTts } from "../../tts/elevenlabs";
-import { resolveTtsProviderName } from "../../tts/provider";
-import type { TtsProvider } from "../../tts/provider";
+import { createTtsProvider } from "../../tts/provider";
 import { runPaths } from "../rundir";
+import { OptionError, numberOption } from "./optionValues";
 
 const USAGE = `usage: pnpm motife tts [doc.json] --run <dir> [options]
 
@@ -66,21 +64,37 @@ export async function run(argv: string[]): Promise<number> {
     console.error(`motife tts: cannot read ${docPath}: ${(err as Error).message}`);
     return 2;
   }
-  const rawInput: unknown = JSON.parse(rawText);
+  let rawInput: unknown;
+  try {
+    rawInput = JSON.parse(rawText);
+  } catch (err) {
+    console.error(
+      `motife DSL: 1 error in "${docPath}".\n\n` +
+        `ERROR  (whole file)\n  Not valid JSON: ${(err as Error).message}\n` +
+        `  fix: point at a file produced by \`motife generate\` or hand-written valid JSON.`,
+    );
+    return 1;
+  }
   const parsed = parseDocument(rawInput);
   if (!parsed.ok) {
     console.error(formatIssues(docPath, parsed.issues));
     return 1;
   }
 
-  const name = resolveTtsProviderName(args.values.tts);
-  const provider: TtsProvider =
-    name === "openai"
-      ? createOpenAiTts({ voice: args.values.voice })
-      : createElevenLabsTts({ voice: args.values.voice });
+  let leadSeconds: number | undefined;
+  let tailSeconds: number | undefined;
+  try {
+    leadSeconds = numberOption("--lead", args.values.lead, { min: 0 });
+    tailSeconds = numberOption("--tail", args.values.tail, { min: 0 });
+  } catch (err) {
+    if (err instanceof OptionError) {
+      console.error(`motife tts: ${err.message}\n\n${USAGE}`);
+      return 2;
+    }
+    throw err;
+  }
 
-  const leadSeconds = args.values.lead === undefined ? undefined : Number(args.values.lead);
-  const tailSeconds = args.values.tail === undefined ? undefined : Number(args.values.tail);
+  const provider = createTtsProvider({ flag: args.values.tts, voice: args.values.voice });
 
   const { manifest, synthesized, reused } = await synthesizeDoc({
     doc: parsed.doc,
