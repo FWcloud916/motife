@@ -1,10 +1,8 @@
 import { Composition } from "remotion";
-import type { CalculateMetadataFunction } from "remotion";
 import { loadFonts } from "../components";
 import { parseDocumentOrThrow } from "../compiler";
 import { dslTotalFrames } from "../compiler/timeline";
-import { DslVideo } from "../compiler/render";
-import type { DslVideoProps } from "../compiler/render";
+import { DslVideo, dslPreviewCalculateMetadata } from "../compiler/render";
 import { RAW_DOCS } from "../dsl/docs/manifest";
 import { ComponentGallery, GALLERY_TOTAL_FRAMES } from "./compositions/gallery/ComponentGallery";
 import { FPS, WIDTH, HEIGHT } from "./compositions/videoDefaults";
@@ -69,21 +67,10 @@ const BLANK_DOC = parseDocumentOrThrow(
   "DslPreview",
 );
 
-// A separately-typed const, not an inline arrow function passed directly
-// to the prop: Composition's generic Props parameter is inferred from
-// calculateMetadata's own declared type (CalculateMetadataFunction<T>),
-// and TS can't work that inference backward through an untyped inline
-// callback — matching Remotion's own calculate-metadata.mdx example.
-const dslPreviewCalculateMetadata: CalculateMetadataFunction<DslVideoProps> = ({ props }) => {
-  const doc = parseDocumentOrThrow(props.doc as unknown, "DslPreview");
-  return {
-    durationInFrames: dslTotalFrames(doc),
-    fps: doc.fps,
-    width: doc.width,
-    height: doc.height,
-    props: { doc },
-  };
-};
+// dslPreviewCalculateMetadata lives in src/compiler/render/previewMetadata.ts
+// (plain TS, unit-tested) — it re-validates inputProps through the parse
+// gate and spreads extra keys (the Phase 3 audio sidecar) through instead
+// of dropping them.
 
 // Registers every font the component library depends on (Inter, Noto Sans
 // TC, JetBrains Mono) before any composition below can mount. Called once

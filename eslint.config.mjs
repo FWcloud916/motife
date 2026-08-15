@@ -11,6 +11,22 @@ export default [
       globals: {
         process: "readonly",
         console: "readonly",
+        Buffer: "readonly",
+      },
+    },
+  },
+  {
+    // Phase 3's agent pipeline runs under Node (via tsx), not the browser —
+    // same reasoning as the scripts/ override above, but for the TS
+    // pipeline packages. Kept to globals only; every Remotion rule still
+    // applies (harmlessly) to this non-Remotion code.
+    files: ["src/agent/**/*.ts", "src/tts/**/*.ts", "src/critique/**/*.ts"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        URL: "readonly",
       },
     },
   },

@@ -25,3 +25,6 @@ build
 *.tsbuildinfo
 
 # Ignore the output video from Git but not videos you import into src/
+
+# vitest coverage reports
+coverage/

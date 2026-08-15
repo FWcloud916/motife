@@ -138,16 +138,14 @@ Prompt(概念描述)
 
 ## 6. 立即下一步
 
-Phase 0/1/2 皆已完成並驗收(見上方各 Phase 勾選項與驗收說明)。下一步是
-Phase 3 — Agent Pipeline:
+Phase 0/1/2 皆已完成並驗收。Phase 3 的實作已全數落地(`pnpm motife` CLI:
+generate / validate / tts / render / stills / critique / revise / run /
+eval,見 `docs/agent-pipeline.md`;多供應商 LLM 走 Vercel AI SDK、TTS 支援
+OpenAI 與 ElevenLabs、另有 coding agent 直接驅動的 skill 模式
+`.claude/skills/motife-generate/`)。剩餘的 Phase 3 驗收步驟:
 
-1. 設計 Prompt → DSL 的 system prompt:以 `docs/dsl-schema.md` 為規格來源,
-   `src/dsl/docs/*.json` 三份手寫文件當 few-shot 範例
-2. 整合 TTS:旁白音檔 → 量測長度 → 回填每個 scene 的 `durationInSeconds`
-   (取代目前手動猜測的暫定值)
-3. 串 compiler 的錯誤回饋迴圈:`formatIssues()` 的輸出已針對「LLM 讀了能不能
-   照著修」設計(見 `docs/dsl-schema.md`「Validation issue codes」),驗證
-   失敗時把整段文字餵回 LLM retry
-4. 建 critique loop:`renderStill()` 抽關鍵影格 → vision model 檢查 → 產生
-   DSL 修改 → re-render,設最大迭代次數
-5. 對 eval set 3 個概念全自動跑一輪,人工評分(驗收標準見上方 Phase 3)
+1. 設定 `.env`(照 `.env.example`;至少一家 LLM key + TTS key)
+2. `pnpm motife eval` — 3 個 eval 概念全自動跑一輪(每支影片:
+   prompt → DSL → TTS → render → critique → ≤2 輪修訂)
+3. 依 `out/eval/<date>/report.md` 的評分表人工評分;通過即勾掉上方
+   Phase 3 的驗收項,失敗模式回饋進 Phase 4 的待辦
