@@ -48,14 +48,40 @@ export function createLlmClient(spec: { provider: ProviderName; model: string })
   const model = modelFor(spec.provider, spec.model);
   return {
     async complete(req: LlmRequest): Promise<{ text: string }> {
+      const { instructions, rest } = splitInstructions(req.messages);
       const result = await generateText({
         model,
-        messages: req.messages.map(toModelMessage),
+        // AI SDK v7 rejects system-role entries inside `messages`
+        // (allowSystemInMessages defaults to false) — system content must
+        // ride the `instructions` option instead.
+        ...(instructions === null ? {} : { instructions }),
+        messages: rest.map(toModelMessage),
         maxOutputTokens: req.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
       });
       return { text: result.text };
     },
   };
+}
+
+/** Exported for tests — lifts system messages out of the conversation into
+ * a single instructions string (AI SDK v7's required shape). */
+export function splitInstructions(messages: LlmMessage[]): {
+  instructions: string | null;
+  rest: LlmMessage[];
+} {
+  const systemTexts: string[] = [];
+  const rest: LlmMessage[] = [];
+  for (const message of messages) {
+    if (message.role === "system") {
+      if (typeof message.content !== "string") {
+        throw new Error("System messages must have plain-string content.");
+      }
+      systemTexts.push(message.content);
+    } else {
+      rest.push(message);
+    }
+  }
+  return { instructions: systemTexts.length > 0 ? systemTexts.join("\n\n") : null, rest };
 }
 
 function modelFor(provider: ProviderName, modelId: string): LanguageModel {

@@ -89,13 +89,22 @@ Prompt(概念描述)
 
 ### Phase 3 — Agent Pipeline(約 2–3 週)
 
-- [ ] Prompt → DSL:system prompt + schema + few-shot(用 Phase 2 手寫的 DSL 當範例)
-- [ ] TTS 整合:旁白音檔 → step 時長 → 字幕軌
-- [ ] Critique loop:renderStill 抽每個 step 的關鍵影格 → vision model 檢查(重疊?溢出?節奏?)→ 產生 DSL 修改 → re-render,設最大迭代次數
-- [ ] Compiler 錯誤自動回饋:validation 失敗時把錯誤訊息餵回 LLM retry
-- [ ] 對 eval set 3 個概念全自動跑一輪,人工評分
+- [x] Prompt → DSL:system prompt + schema + few-shot(用 Phase 2 手寫的 DSL 當範例)
+- [x] TTS 整合:旁白音檔 → step 時長 → 字幕軌
+- [x] Critique loop:renderStill 抽每個 step 的關鍵影格 → vision model 檢查(重疊?溢出?節奏?)→ 產生 DSL 修改 → re-render,設最大迭代次數
+- [x] Compiler 錯誤自動回饋:validation 失敗時把錯誤訊息餵回 LLM retry
+- [x] 對 eval set 3 個概念全自動跑一輪,人工評分
 
-**驗收:一句 prompt 進、一支及格的 MP4 出,全程無人工介入。**
+**驗收:一句 prompt 進、一支及格的 MP4 出,全程無人工介入。** ✅ 已達成 —
+2026-08-15 `pnpm motife eval`(generation: claude-sonnet-5、TTS: OpenAI)3/3 概念
+全自動出片、零人工介入;人工評分全數通過及格線(每項 ≥3、無 1 分):
+jwt-auth 5/4/4/3、mq-backpressure 5/3/4/3、db-index 5/3/4/3。三個 DSL 皆一次
+生成即通過驗證(retry loop 未動用);jwt-auth 與 mq-backpressure 首輪 critique
+即 clean,db-index 用盡 2 輪修訂預算仍出片。評分記錄的失敗模式(→ Phase 4
+確定性修復佇列):
+1. Diagram 節點卡片過大遭畫面裁切(critique 有抓到但 LLM 改 DSL 救不了)
+2. Camera 運鏡超出畫面範圍
+3. TTS 中文旁白口音重(OpenAI alloy — 換 voice/model 或 ElevenLabs)
 
 ### Phase 4 — 打磨與發布(約 2 週)
 
@@ -138,14 +147,13 @@ Prompt(概念描述)
 
 ## 6. 立即下一步
 
-Phase 0/1/2 皆已完成並驗收。Phase 3 的實作已全數落地(`pnpm motife` CLI:
-generate / validate / tts / render / stills / critique / revise / run /
-eval,見 `docs/agent-pipeline.md`;多供應商 LLM 走 Vercel AI SDK、TTS 支援
-OpenAI 與 ElevenLabs、另有 coding agent 直接驅動的 skill 模式
-`.claude/skills/motife-generate/`)。剩餘的 Phase 3 驗收步驟:
+Phase 0/1/2/3 皆已完成並驗收(見上方各 Phase 勾選項與驗收說明)。下一步是
+Phase 4 — 打磨與發布,優先順序依驗收記錄的失敗模式:
 
-1. 設定 `.env`(照 `.env.example`;至少一家 LLM key + TTS key)
-2. `pnpm motife eval` — 3 個 eval 概念全自動跑一輪(每支影片:
-   prompt → DSL → TTS → render → critique → ≤2 輪修訂)
-3. 依 `out/eval/<date>/report.md` 的評分表人工評分;通過即勾掉上方
-   Phase 3 的驗收項,失敗模式回饋進 Phase 4 的待辦
+1. **確定性修復三個已知失敗模式**(改元件/compiler,不改 prompt):
+   Diagram 節點卡片溢出畫面(db-index critique 循環無法收斂的主因)、
+   Camera 運鏡超出範圍、TTS 中文旁白口音(評估 OpenAI 其他 voice/model
+   與 ElevenLabs)
+2. 用 10+ 個新概念(不在 eval set 內)壓力測試,收集更多失敗模式
+3. `@remotion/player` 網頁預覽頁(prompt → 線上預覽 → 下載 MP4)
+4. 決定發布形式(開源工具 / demo 網站 / 內容創作自用)

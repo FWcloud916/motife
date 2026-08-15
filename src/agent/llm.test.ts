@@ -35,3 +35,21 @@ describe("toModelMessage", () => {
     ).toThrow(/Only user messages may carry image parts/);
   });
 });
+
+describe("splitInstructions", () => {
+  it("lifts system messages into a single instructions string", async () => {
+    const { splitInstructions } = await import("./llm");
+    const { instructions, rest } = splitInstructions([
+      { role: "system", content: "be helpful" },
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+    ]);
+    expect(instructions).toBe("be helpful");
+    expect(rest.map((message) => message.role)).toEqual(["user", "assistant"]);
+  });
+
+  it("returns null instructions when there is no system message", async () => {
+    const { splitInstructions } = await import("./llm");
+    expect(splitInstructions([{ role: "user", content: "hi" }]).instructions).toBeNull();
+  });
+});

@@ -1,7 +1,7 @@
 # Phase 3 — Agent Pipeline
 
 **Slug:** phase-3-agent-pipeline
-**Status:** review
+**Status:** done
 **Ticket:** N/A
 **Related plan:** [phase-3-agent-pipeline-silly-soaring-cherny.md](../_plans/phase-3-agent-pipeline-silly-soaring-cherny.md)
 **Created:** 2026-08-14
@@ -110,6 +110,6 @@ on a keyless machine.
 
 > Fill in after development finishes.
 
-**Final status:**
-**PR / Commit:**
-**Follow-ups:**
+**Final status:** done — PR #10 merged into main on 2026-08-15 (merge commit; CodeRabbit round addressed in 448d5ed/c438e2a).
+**PR / Commit:** https://github.com/FWcloud916/motife/pull/10
+**Follow-ups:** `pnpm motife eval` acceptance run + human scoring (in progress on branch phase-3/eval-run-fixes — first run surfaced the AI SDK v7 instructions requirement, fixed in llm.ts); Phase 4 planning.
