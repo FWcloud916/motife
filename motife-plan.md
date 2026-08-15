@@ -89,13 +89,22 @@ Prompt(概念描述)
 
 ### Phase 3 — Agent Pipeline(約 2–3 週)
 
-- [ ] Prompt → DSL:system prompt + schema + few-shot(用 Phase 2 手寫的 DSL 當範例)
-- [ ] TTS 整合:旁白音檔 → step 時長 → 字幕軌
-- [ ] Critique loop:renderStill 抽每個 step 的關鍵影格 → vision model 檢查(重疊?溢出?節奏?)→ 產生 DSL 修改 → re-render,設最大迭代次數
-- [ ] Compiler 錯誤自動回饋:validation 失敗時把錯誤訊息餵回 LLM retry
-- [ ] 對 eval set 3 個概念全自動跑一輪,人工評分
+- [x] Prompt → DSL:system prompt + schema + few-shot(用 Phase 2 手寫的 DSL 當範例)
+- [x] TTS 整合:旁白音檔 → step 時長 → 字幕軌
+- [x] Critique loop:renderStill 抽每個 step 的關鍵影格 → vision model 檢查(重疊?溢出?節奏?)→ 產生 DSL 修改 → re-render,設最大迭代次數
+- [x] Compiler 錯誤自動回饋:validation 失敗時把錯誤訊息餵回 LLM retry
+- [x] 對 eval set 3 個概念全自動跑一輪,人工評分
 
-**驗收:一句 prompt 進、一支及格的 MP4 出,全程無人工介入。**
+**驗收:一句 prompt 進、一支及格的 MP4 出,全程無人工介入。** ✅ 已達成 —
+2026-08-15 `pnpm motife eval`(generation: claude-sonnet-5、TTS: OpenAI)3/3 概念
+全自動出片、零人工介入;人工評分全數通過及格線(每項 ≥3、無 1 分):
+jwt-auth 5/4/4/3、mq-backpressure 5/3/4/3、db-index 5/3/4/3。三個 DSL 皆一次
+生成即通過驗證(retry loop 未動用);jwt-auth 與 mq-backpressure 首輪 critique
+即 clean,db-index 用盡 2 輪修訂預算仍出片。評分記錄的失敗模式(→ Phase 4
+確定性修復佇列):
+1. Diagram 節點卡片過大遭畫面裁切(critique 有抓到但 LLM 改 DSL 救不了)
+2. Camera 運鏡超出畫面範圍
+3. TTS 中文旁白口音重(OpenAI alloy — 換 voice/model 或 ElevenLabs)
 
 ### Phase 4 — 打磨與發布(約 2 週)
 
