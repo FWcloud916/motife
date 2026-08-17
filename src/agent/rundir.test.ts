@@ -48,6 +48,7 @@ describe("run/iteration path layout", () => {
   it("is the documented contract (docs/agent-pipeline.md §3)", () => {
     const paths = runPaths("out/runs/x");
     expect(paths.docJson).toBe(path.join("out/runs/x", "doc.json"));
+    expect(paths.docFinalJson).toBe(path.join("out/runs/x", "doc.final.json"));
     expect(paths.docTtsJson).toBe(path.join("out/runs/x", "doc.tts.json"));
     expect(paths.audioDir).toBe(path.join("out/runs/x", "public", "audio"));
     expect(paths.audioManifest).toBe(path.join("out/runs/x", "audio-manifest.json"));
@@ -57,6 +58,7 @@ describe("run/iteration path layout", () => {
     expect(iter.root).toBe(path.join("out/runs/x", "iterations", "iter-2"));
     expect(iter.stillsDir).toBe(path.join(iter.root, "stills"));
     expect(iter.critiqueMd).toBe(path.join(iter.root, "critique.md"));
+    expect(iter.docJson).toBe(path.join(iter.root, "doc.json"));
   });
 });
 

@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-4/progress-tracking-kickoff` | N/A | PR 0, [#12](https://github.com/FWcloud916/motife/pull/12); PR 1/PR 2 use their own branches |
+| `motife` | `phase-4/keep-best-iteration` | N/A |  |
 
 ## Background & goals
 
@@ -98,8 +98,8 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 
 | # | PR | Content | Baseline re-render required? | Status |
 |---|---|---|---|---|
-| 0 | progress 追蹤 | This progress item; motife-plan.md Phase 4 acceptance criterion added | No | in-progress |
-| 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | not started |
+| 0 | progress 追蹤 | This progress item; motife-plan.md Phase 4 acceptance criterion added | No | done ([#12](https://github.com/FWcloud916/motife/pull/12)) |
+| 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | review |
 | 2 | Camera clamp | Zoom upper-bound converges to fit + per-frame translation clamp (fixes failure mode 2 + the Camera-nested half of mode 1) | **Yes** | not started |
 | 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram + `validate.ts` estimated-footprint lint (moves the signal into the generate retry loop, which the LLM *can* act on) | Yes | not started |
 | 4 | TTS model wiring + A/B | `--tts-model`/`MOTIFE_TTS_MODEL` + narration-hash includes model; OpenAI voices/instructions **and** ElevenLabs zh voice both evaluated | Audio re-synthesis only | not started |
@@ -114,11 +114,11 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 0 — Update motife-plan.md §3 Phase 4 with the acceptance criterion above
 - [x] PR 0 — Fix Phase 3 progress item's placeholder Outcome section
 - [x] PR 0 — Open PR (progress/ + motife-plan.md only, no src/ changes)
-- [ ] PR 1 — `pipeline.ts` keep-best-iteration (track best by errors→warnings→earlier-iteration tiebreak); per-iteration `doc.json` snapshot; `doc.final.json` in run root
-- [ ] PR 1 — `IterationSummary` carries `issues: CritiqueIssue[]`; `eval.ts` inlines them into `report.md`
-- [ ] PR 1 — `docs/agent-pipeline.md` run-dir contract update + Last-updated bump
-- [ ] PR 1 — Tests: 1→2→1 ships iter 1, 2→1 ships iter 2, clean-first unchanged
-- [ ] PR 1 — `pnpm verify` green, open PR
+- [x] PR 1 — `pipeline.ts` keep-best-iteration (track best by errors→warnings→earlier-iteration tiebreak); per-iteration `doc.json` snapshot; `doc.final.json` in run root
+- [x] PR 1 — `IterationSummary` carries `issues: CritiqueIssue[]`; `eval.ts` inlines them into `report.md`
+- [x] PR 1 — `docs/agent-pipeline.md` run-dir contract update + Last-updated bump
+- [x] PR 1 — Tests: 1→2→1 ships iter 1, 2→1 ships iter 2, clean-first unchanged
+- [x] PR 1 — `pnpm verify` green, open PR
 - [ ] PR 2 — Extract `Camera.tsx` math into pure `cameraMath.ts`; zoom clamp (fit-bounded) + translation clamp (post-lerp)
 - [ ] PR 2 — `docs/component-library.md` Camera section update + Last-updated bump
 - [ ] PR 2 — Unit tests: zoom clamp, translation clamp, centering, lerp continuity
@@ -132,6 +132,8 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 -
 - Created full Phase 4 breakdown (8 PRs) with baseline re-render requirements, failure-mode queue with per-concept attribution, known deferrals (word-level captions, TreeDiagram, pipeline log persistence), user decisions (TTS A/B both providers, publish-form deferred), and a proposed Phase 4 acceptance criterion. This session scoped to PR 0 (this item) + PR 1 (keep-best/critique archival) + PR 2 (Camera clamp).
 - PR 0 opened: https://github.com/FWcloud916/motife/pull/12 (branch phase-4/progress-tracking-kickoff) -- motife-plan.md Phase 4 acceptance criterion added, Phase 3 Outcome placeholder fixed, this progress item created. progress/ tracker check passes. PR 1 and PR 2 will each get their own branch/PR once this one merges.
+- PR 1 implemented: pipeline.ts tracks best-scoring iteration (fewest errors, then warnings, then earliest on a tie) and ships it as final.mp4/doc.final.json instead of always the last render; per-iteration doc.json snapshots added to rundir.ts; IterationSummary carries critique issues, inlined into eval.ts's report.md. Tests: 3 new/updated pipeline.test.ts cases covering tie-break-to-earlier, regression-then-recovery (1->2->1), and strict-improvement (2->1) scenarios, plus rundir.test.ts field coverage. docs/agent-pipeline.md run-dir contract + critique-loop section updated, Last-updated bumped. pnpm verify green (196 tests, keyless).
+- PR 1 opened: https://github.com/FWcloud916/motife/pull/13 (branch phase-4/keep-best-iteration).
 
 ## Outcome
 

@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Anyone driving `pnpm motife`; coding agents in skill mode
-> **Last updated:** 2026-08-14
+> **Last updated:** 2026-08-17
 >
 > Phase 3's prompt→MP4 pipeline: the `motife` CLI, the run-directory
 > contract, and configuration. Schema/document reference:
@@ -58,12 +58,14 @@ ElevenLabs additionally needs a voice id (`--voice` or
 out/runs/<name>/
 ├── prompt.txt                  # the input concept
 ├── attempts/                   # generate retry history: 01.dsl.json, 01.issues.txt, ...
-├── doc.json                    # the accepted document (pre-TTS) — the canonical editable artifact
+├── doc.json                    # the LATEST accepted document (pre-TTS) — the canonical editable artifact
+├── doc.final.json              # the pre-TTS document that produced the SHIPPED iteration (see below)
 ├── public/audio/<sceneId>.mp3  # per-scene narration (bundle publicDir → staticFile())
 ├── audio-manifest.json         # {scenes: {<id>: {src, durationInSeconds, narrationHash, delaySeconds}}}
 ├── doc.tts.json                # DERIVED: doc.json with durations = lead + measured audio + tail
 ├── iterations/iter-<n>/
 │   ├── video.mp4
+│   ├── doc.json                 # snapshot of doc.json AS IT WAS for this iteration's render
 │   ├── stills/<sceneId>-<early|mid|late>-f<frame>.jpeg
 │   ├── critique.json / critique.md
 │   ├── revise-01.dsl.json ...  # revision retry history
@@ -82,6 +84,14 @@ Rules the layout encodes:
   edit `doc.json` and re-run `motife tts`. The narration hash
   (provider+voice+text) means only scenes whose narration changed are
   re-synthesized.
+- **`final.mp4` ships the best-scoring iteration, not necessarily the
+  last.** A revision can make critique worse, not just fix it — the
+  pipeline tracks the iteration with the fewest errors (then fewest
+  warnings, then the earliest on a tie) and copies ITS render to
+  `final.mp4` and ITS pre-TTS doc to `doc.final.json`. `doc.json` at the
+  run root always stays the latest accepted document regardless of which
+  iteration shipped — use `doc.final.json` to recover what actually
+  produced the delivered video. `report.md` marks the shipped iteration.
 - **Timing stays per-scene.** TTS backfills `durationInSeconds =
   0.3 (lead) + measured audio + 0.7 (tail)`; every step window inside a
   scene is a symbolic `WindowRef`, so nothing else needs touching
@@ -102,8 +112,11 @@ the current document go back to the generation LLM for a full-document
 revision (same `parseDocument()` retry loop as generation), TTS refreshes
 changed scenes, and it re-renders — at most `--max-revisions` times
 (default 2, so ≤3 renders). A run that exhausts the budget still ships
-`final.mp4` (the last render) with unresolved issues recorded in
-`report.md`; only a document that never validates fails the run.
+`final.mp4`, but not necessarily the last render: the pipeline tracks
+every iteration's error/warning counts and ships whichever iteration
+scored best (a revision can regress layout, not just fix it), tying to the
+earliest iteration when scores match — see the run-dir contract above.
+Only a document that never validates fails the run.
 
 ## 5. Configuration
 

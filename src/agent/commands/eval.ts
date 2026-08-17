@@ -180,13 +180,17 @@ function renderEvalReport(
     }
     const r = entry.result;
     lines.push(
-      `- video: \`${entry.slug}/final.mp4\``,
+      `- video: \`${entry.slug}/final.mp4\` (iteration ${r.shippedIteration ?? "?"} of ${r.iterations.length})`,
       `- generate attempts: ${r.generateAttempts}`,
-      ...r.iterations.map(
-        (iter) =>
-          `- iteration ${iter.iteration}: ${iter.errors} error(s), ${iter.warnings} warning(s)` +
+      ...r.iterations.flatMap((iter) => [
+        `- iteration ${iter.iteration}: ${iter.errors} error(s), ${iter.warnings} warning(s)` +
+          (iter.iteration === r.shippedIteration ? " (shipped)" : "") +
           ` (\`${entry.slug}/iterations/iter-${iter.iteration}/critique.md\`)`,
-      ),
+        ...iter.issues.map(
+          (issue) =>
+            `  - **${issue.severity.toUpperCase()} / ${issue.kind}** [${issue.sceneId}] ${issue.description} — fix: ${issue.suggestion}`,
+        ),
+      ]),
       `- outcome: ${r.clean ? "critique clean" : "revision budget exhausted"}`,
       `- elapsed: ${entry.elapsedSeconds}s`,
       "",
