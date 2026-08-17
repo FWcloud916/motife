@@ -108,8 +108,24 @@ on a keyless machine.
 
 ## Outcome
 
-> Fill in after development finishes.
+Acceptance met in full: `pnpm motife eval` (branch `phase-3/eval-run-fixes`,
+PR #11) ran all 3 eval concepts end to end with zero manual intervention —
+generation: claude-sonnet-5, TTS: OpenAI. All three passed the human-scoring
+bar (every dimension ≥3, no 1s): jwt-auth 5/4/4/3, mq-backpressure 5/3/4/3,
+db-index 5/3/4/3. All three DSL docs validated on first generation attempt
+(the retry loop was never exercised); jwt-auth and mq-backpressure passed
+critique clean on the first iteration, db-index used its full 2-revision
+budget without reaching clean. See
+`progress/2026-08-14-phase-3-agent-pipeline/eval-report-2026-08-15.md` for
+the archived report and motife-plan.md:104-107 for the acceptance record.
 
-**Final status:** done — PR #10 merged into main on 2026-08-15 (merge commit; CodeRabbit round addressed in 448d5ed/c438e2a).
-**PR / Commit:** https://github.com/FWcloud916/motife/pull/10
-**Follow-ups:** `pnpm motife eval` acceptance run + human scoring (in progress on branch phase-3/eval-run-fixes — first run surfaced the AI SDK v7 instructions requirement, fixed in llm.ts); Phase 4 planning.
+Scoring surfaced three failure modes, all in the deterministic rendering
+layer rather than the LLM semantic layer (content correctness was 5/5/5
+across the board) — handed off as Phase 4's fix queue:
+Diagram node-card overflow/clipping (2/3 concepts), Camera motion exiting
+the frame (1/3, db-index), and heavy-accented zh-TW TTS narration (3/3).
+Tracked in detail in `progress/2026-08-17-phase-4-polish-and-publish/`.
+
+**Final status:** done — PR #10 merged into main on 2026-08-15 (merge commit; CodeRabbit round addressed in 448d5ed/c438e2a). Eval acceptance run landed separately via PR #11 (`phase-3/eval-run-fixes`, merge commit 441ca42) after fixing an AI SDK v7 `instructions`-vs-`messages` requirement in `llm.ts`.
+**PR / Commit:** https://github.com/FWcloud916/motife/pull/10, https://github.com/FWcloud916/motife/pull/11
+**Follow-ups:** Phase 4 — see `progress/2026-08-17-phase-4-polish-and-publish/`.
