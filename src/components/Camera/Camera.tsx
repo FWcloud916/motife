@@ -108,17 +108,68 @@ export const CameraTarget: FC<{ id: string; children: ReactNode }> = ({ id, chil
 // zoom/translation math (including the clamps that keep a shot's target,
 // and the overall content, from panning off frame) lives in cameraMath.ts.
 //
-// Assumes Camera fills the full composition frame (the common case: a
-// Scene's content, full-bleed). Its own viewport size comes from
-// useVideoConfig() — synchronous and exact on the very first render —
-// rather than ref-measuring its wrapper div's clientWidth/clientHeight,
-// for the same reason Diagram's `fit` no longer does: a one-shot DOM
-// measurement can observe a stale, too-small size before Remotion's
-// headless Chrome finishes settling the surrounding layout.
+// The viewport the math frames against is Camera's own MEASURED box, not
+// useVideoConfig()'s composition size. An earlier version assumed the
+// full composition frame to avoid DOM measurement (a naive one-shot
+// clientWidth read can observe a stale pre-layout size — the bug that
+// made Diagram's original `fit` non-deterministic), but in practice a
+// Camera almost never gets the full frame: Scene reserves header/caption
+// clearance, and a sibling in the same Stack (db-index's steps card, in
+// the eval run that surfaced this) shrinks the box further, so
+// 1080-based framing was silently clipped by the wrapper's own
+// `overflow: hidden`. The measurement here is safe for the same reasons
+// CameraTarget's is (see its doc comment): it's gated on fontsReady()
+// (the only async resource that moves layout), a delayRender handle
+// taken eagerly at mount holds the render until the first post-fonts
+// measurement lands, and the effect re-measures on every commit with a
+// dedupe so the steady state is a no-op. useVideoConfig() remains only
+// as the pre-measurement fallback (never screenshotted) and the
+// `focus: "all"` rect default.
 export const Camera: FC<CameraProps> = ({ shots, children }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useSceneTiming();
-  const { width: containerWidth, height: containerHeight } = useVideoConfig();
+  const { width: compositionWidth, height: compositionHeight } = useVideoConfig();
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [measuredViewport, setMeasuredViewport] = useState<{ width: number; height: number } | null>(
+    null,
+  );
+  const [viewportHandle] = useState(() => delayRender("<Camera> viewport measurement"));
+  const viewportSettled = useRef(false);
+  const settleViewport = useCallback(() => {
+    if (!viewportSettled.current) {
+      viewportSettled.current = true;
+      continueRender(viewportHandle);
+    }
+  }, [viewportHandle]);
+
+  // Deliberately no dependency array: re-measure after every commit (the
+  // dedupe below makes the steady state a no-op), so anything that
+  // resizes the wrapper later is picked up.
+  useEffect(() => {
+    let cancelled = false;
+    fontsReady()
+      .then(() => {
+        if (cancelled) return;
+        const node = viewportRef.current;
+        if (node && node.offsetWidth > 0 && node.offsetHeight > 0) {
+          const width = node.offsetWidth;
+          const height = node.offsetHeight;
+          setMeasuredViewport((prev) =>
+            prev && prev.width === width && prev.height === height ? prev : { width, height },
+          );
+        }
+        settleViewport();
+      })
+      .catch((error) => cancelRender(error));
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  // Release the handle on unmount so a Camera that unmounts before fonts
+  // settle can't hang the render until the 30s timeout.
+  useEffect(() => settleViewport, [settleViewport]);
 
   const [targets, setTargets] = useState<Record<string, TargetRect>>({});
   const register = useCallback((id: string, rect: TargetRect) => {
@@ -138,13 +189,13 @@ export const Camera: FC<CameraProps> = ({ shots, children }) => {
   }, []);
   const registry = useMemo(() => ({ register }), [register]);
 
-  const containerSize = { width: containerWidth, height: containerHeight };
+  const viewport = measuredViewport ?? { width: compositionWidth, height: compositionHeight };
   const resolvedShots = shots.map((shot) => ({
     shot,
     range: resolveWindow(shot.window, durationInFrames),
-    rect: focusRectFor(shot.focus, targets, containerSize),
+    rect: focusRectFor(shot.focus, targets, viewport),
   }));
-  const transform = resolveCameraTransform(frame, resolvedShots, targets, containerSize);
+  const transform = resolveCameraTransform(frame, resolvedShots, targets, viewport);
   const style = transform
     ? {
         transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.zoom})`,
@@ -153,7 +204,10 @@ export const Camera: FC<CameraProps> = ({ shots, children }) => {
     : {};
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div
+      ref={viewportRef}
+      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}
+    >
       <CameraRegistryContext.Provider value={registry}>
         <div style={{ position: "absolute", inset: 0, ...style }}>{children}</div>
       </CameraRegistryContext.Provider>
