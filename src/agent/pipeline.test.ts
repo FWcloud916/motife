@@ -29,6 +29,7 @@ const VALID_DOC = {
   })),
 };
 const REVISED_DOC = { ...VALID_DOC, title: "Pipeline (revised)" };
+const REVISED_DOC_2 = { ...VALID_DOC, title: "Pipeline (revised twice)" };
 
 const CLEAN: CritiqueReport = { issues: [] };
 const HAS_ERROR: CritiqueReport = {
@@ -39,6 +40,18 @@ const HAS_ERROR: CritiqueReport = {
       kind: "overflow",
       description: "Title clipped.",
       suggestion: "Shorten it.",
+    },
+  ],
+};
+const HAS_TWO_ERRORS: CritiqueReport = {
+  issues: [
+    ...HAS_ERROR.issues,
+    {
+      sceneId: "breakdown",
+      severity: "error",
+      kind: "offscreen",
+      description: "Camera drifted off frame.",
+      suggestion: "Reframe the shot.",
     },
   ],
 };
@@ -123,13 +136,25 @@ describe("runPipeline", () => {
       stages,
     );
 
-    expect(result).toMatchObject({ ok: true, clean: true, generateAttempts: 1 });
-    expect(result.iterations).toEqual([{ iteration: 1, errors: 0, warnings: 0 }]);
+    expect(result).toMatchObject({
+      ok: true,
+      clean: true,
+      generateAttempts: 1,
+      shippedIteration: 1,
+    });
+    expect(result.iterations).toEqual([{ iteration: 1, errors: 0, warnings: 0, issues: [] }]);
     expect(calls.renderedVideos).toHaveLength(1);
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
     expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
       "passed critique with zero errors",
     );
+    // doc.final.json and the per-iteration doc.json snapshot both exist.
+    expect(await readFile(path.join(dir, "run", "doc.final.json"), "utf8")).toContain(
+      '"Pipeline"',
+    );
+    expect(
+      await readFile(path.join(dir, "run", "iterations", "iter-1", "doc.json"), "utf8"),
+    ).toContain('"Pipeline"');
   });
 
   it("revises after an error critique, then stops clean", async () => {
@@ -139,6 +164,7 @@ describe("runPipeline", () => {
 
     expect(result.clean).toBe(true);
     expect(result.iterations.map((summary) => summary.errors)).toEqual([1, 0]);
+    expect(result.shippedIteration).toBe(2);
     expect(calls.renderedVideos).toHaveLength(2);
 
     // The revision replaced doc.json and archived the pre-revision state.
@@ -159,7 +185,9 @@ describe("runPipeline", () => {
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:2");
   });
 
-  it("ships the last render when the revision budget is exhausted", async () => {
+  it("ships the best-scoring iteration, tying to the earlier one, when the revision budget is exhausted", async () => {
+    // Both iterations score identically (1 error, 0 warnings) — a tie keeps
+    // the EARLIER iteration, since the revision bought nothing.
     const { stages, calls } = fakeStages([HAS_ERROR]);
     const client = new FakeLlmClient([
       JSON.stringify(VALID_DOC),
@@ -171,10 +199,44 @@ describe("runPipeline", () => {
     expect(result.clean).toBe(false);
     expect(result.iterations).toHaveLength(2); // maxRevisions + 1
     expect(calls.renderedVideos).toHaveLength(2);
-    expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:2");
+    expect(result.shippedIteration).toBe(1);
+    expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
     expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
       "Revision budget exhausted",
     );
+    // doc.final.json is iteration 1's doc, not the (equally bad) revision.
+    const docFinal = JSON.parse(
+      await readFile(path.join(dir, "run", "doc.final.json"), "utf8"),
+    ) as typeof VALID_DOC;
+    expect(docFinal.title).toBe("Pipeline");
+  });
+
+  it("ships an earlier iteration when a later revision regresses then partially recovers (1 -> 2 -> 1 errors)", async () => {
+    const { stages, calls } = fakeStages([HAS_ERROR, HAS_TWO_ERRORS, HAS_ERROR]);
+    const client = new FakeLlmClient([
+      JSON.stringify(VALID_DOC),
+      JSON.stringify(REVISED_DOC),
+      JSON.stringify(REVISED_DOC_2),
+    ]);
+    const result = await runPipeline({ ...baseOptions(client), maxRevisions: 2 }, stages);
+
+    expect(result.iterations.map((summary) => summary.errors)).toEqual([1, 2, 1]);
+    expect(calls.renderedVideos).toHaveLength(3);
+    // Iteration 3 ties iteration 1's score (1 error, 0 warnings) — the
+    // EARLIER iteration ships, not the last one that merely matched it.
+    expect(result.shippedIteration).toBe(1);
+    expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
+  });
+
+  it("ships the later iteration once a revision strictly improves the score (2 -> 1 errors)", async () => {
+    const { stages, calls } = fakeStages([HAS_TWO_ERRORS, HAS_ERROR]);
+    const client = new FakeLlmClient([JSON.stringify(VALID_DOC), JSON.stringify(REVISED_DOC)]);
+    const result = await runPipeline({ ...baseOptions(client), maxRevisions: 1 }, stages);
+
+    expect(result.iterations.map((summary) => summary.errors)).toEqual([2, 1]);
+    expect(calls.renderedVideos).toHaveLength(2);
+    expect(result.shippedIteration).toBe(2);
+    expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:2");
   });
 
   it("keeps the current cut when the revision never validates", async () => {

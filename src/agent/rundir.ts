@@ -10,8 +10,13 @@ export interface RunPaths {
   root: string;
   promptTxt: string;
   attemptsDir: string;
-  /** The accepted, pre-TTS document. */
+  /** The accepted, pre-TTS document — always the LATEST one accepted, even
+   * if a later revision scored worse than an earlier iteration. */
   docJson: string;
+  /** The pre-TTS document that produced the best-scoring (shipped)
+   * iteration — a copy of that iteration's `doc.json` snapshot. Distinct
+   * from `docJson` above when the pipeline's last revision didn't win. */
+  docFinalJson: string;
   /** Served as the bundle's publicDir so <Audio src={staticFile(...)}> resolves. */
   publicDir: string;
   audioDir: string;
@@ -29,6 +34,7 @@ export function runPaths(root: string): RunPaths {
     promptTxt: path.join(root, "prompt.txt"),
     attemptsDir: path.join(root, "attempts"),
     docJson: path.join(root, "doc.json"),
+    docFinalJson: path.join(root, "doc.final.json"),
     publicDir: path.join(root, "public"),
     audioDir: path.join(root, "public", "audio"),
     audioManifest: path.join(root, "audio-manifest.json"),
@@ -45,6 +51,10 @@ export interface IterationPaths {
   stillsDir: string;
   critiqueJson: string;
   critiqueMd: string;
+  /** Snapshot of the pre-TTS `doc.json` used for THIS iteration's render —
+   * the run root's `doc.json` gets overwritten by the next revision, so
+   * this is the only record of what produced this iteration's video. */
+  docJson: string;
 }
 
 export function iterationPaths(runRoot: string, iteration: number): IterationPaths {
@@ -55,6 +65,7 @@ export function iterationPaths(runRoot: string, iteration: number): IterationPat
     stillsDir: path.join(root, "stills"),
     critiqueJson: path.join(root, "critique.json"),
     critiqueMd: path.join(root, "critique.md"),
+    docJson: path.join(root, "doc.json"),
   };
 }
 

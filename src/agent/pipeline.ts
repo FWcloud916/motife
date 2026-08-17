@@ -1,17 +1,18 @@
 // The full bounded loop behind `motife run` (and `motife eval`):
 //   generate → [tts → render → stills → critique → revise?] × ≤(1+maxRevisions)
 // Stops early the moment a critique returns zero error-severity issues;
-// after the revision budget is spent, the last render ships as final.mp4
-// with the unresolved issues recorded in report.md — a run FAILS only when
-// generation/revision can't produce a valid document at all. Every stage
-// writes the same run-dir artifacts the standalone subcommands do, so a
-// half-finished run can be picked up by hand.
+// after the revision budget is spent, the BEST-SCORING render ships as
+// final.mp4 (not necessarily the last — a revision can regress, not just
+// fix, layout) with the unresolved issues recorded in report.md — a run
+// FAILS only when generation/revision can't produce a valid document at
+// all. Every stage writes the same run-dir artifacts the standalone
+// subcommands do, so a half-finished run can be picked up by hand.
 import { copyFile, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { formatIssues, parseDocument } from "../compiler";
 import type { DslDocument } from "../dsl";
 import { critiqueFrames } from "../critique/frames";
-import type { CritiqueStillImage } from "../critique/critique";
+import type { CritiqueIssue, CritiqueStillImage } from "../critique/critique";
 import { runCritique } from "../critique/critique";
 import { countBySeverity, renderCritiqueMarkdown } from "../critique/report";
 import { backfillDurations } from "../tts/backfill";
@@ -68,6 +69,7 @@ export interface IterationSummary {
   iteration: number;
   errors: number;
   warnings: number;
+  issues: CritiqueIssue[];
 }
 
 export interface PipelineResult {
@@ -77,7 +79,22 @@ export interface PipelineResult {
   iterations: IterationSummary[];
   /** True when the loop ended because critique came back clean. */
   clean: boolean;
+  /** Which iteration's render was copied to final.mp4 — the best-scoring
+   * one (fewest errors, then fewest warnings, then earliest on a tie), not
+   * necessarily the last. Null when no iteration ever completed critique. */
+  shippedIteration: number | null;
   failureText?: string;
+}
+
+/** Tracks the best-scoring iteration seen so far so a regression late in
+ * the revision loop (critique can make layout worse, not just better)
+ * doesn't ship a worse cut than an earlier iteration already produced. */
+interface BestIteration {
+  iteration: number;
+  video: string;
+  docSnapshot: string;
+  errors: number;
+  warnings: number;
 }
 
 export async function runPipeline(
@@ -117,6 +134,7 @@ export async function runPipeline(
       [],
       "generation-failed",
       false,
+      null,
     );
     return {
       ok: false,
@@ -124,6 +142,7 @@ export async function runPipeline(
       generateAttempts: generated.attempts.length,
       iterations: [],
       clean: false,
+      shippedIteration: null,
       failureText: generated.failureText,
     };
   }
@@ -134,6 +153,7 @@ export async function runPipeline(
   let serveUrl: string | undefined;
   const summaries: IterationSummary[] = [];
   let lastVideo: string | null = null;
+  let best: BestIteration | null = null;
   let clean = false;
   let outcome: RunOutcome = "aborted";
 
@@ -181,6 +201,10 @@ export async function runPipeline(
     serveUrl = context.serveUrl;
     await stages.renderVideo(context, iterPaths.videoMp4);
     lastVideo = iterPaths.videoMp4;
+    // Snapshot the pre-TTS doc that produced this render — doc.json itself
+    // gets overwritten by the next revision, so this is the only record of
+    // what generated this iteration's video.
+    await writeFile(iterPaths.docJson, rawText, "utf8");
 
     const stills = await stages.renderCritiqueStills(
       context,
@@ -208,8 +232,16 @@ export async function runPipeline(
     await writeFile(iterPaths.critiqueMd, markdown, "utf8");
 
     const { errors, warnings } = countBySeverity(report);
-    summaries.push({ iteration, errors, warnings });
+    summaries.push({ iteration, errors, warnings, issues: report.issues });
     log(`pipeline: iteration ${iteration} — ${errors} error(s), ${warnings} warning(s)`);
+
+    // Ties keep the EARLIER iteration — a revision that doesn't improve on
+    // the score is a revision that diverged from generation for nothing.
+    const isBetter =
+      best === null || errors < best.errors || (errors === best.errors && warnings < best.warnings);
+    if (isBetter) {
+      best = { iteration, video: iterPaths.videoMp4, docSnapshot: iterPaths.docJson, errors, warnings };
+    }
 
     if (errors === 0) {
       clean = true;
@@ -245,14 +277,20 @@ export async function runPipeline(
     await writeFile(paths.docJson, `${revised.json}\n`, "utf8");
   }
   } finally {
-    if (lastVideo) await copyFile(lastVideo, paths.finalMp4);
+    // Ship the best-scoring iteration, not necessarily the last — a
+    // revision can make layout worse, not just fix it (observed: the
+    // db-index eval run regressed 1→2 errors before recovering to 1).
+    const shipVideo = best?.video ?? lastVideo;
+    if (shipVideo) await copyFile(shipVideo, paths.finalMp4);
+    if (best) await copyFile(best.docSnapshot, paths.docFinalJson);
     await writeReport(
       paths.reportMd,
       options.prompt,
       generated.attempts.length,
       summaries,
       outcome,
-      lastVideo !== null,
+      shipVideo !== null,
+      best?.iteration ?? null,
     );
   }
   return {
@@ -261,6 +299,7 @@ export async function runPipeline(
     generateAttempts: generated.attempts.length,
     iterations: summaries,
     clean,
+    shippedIteration: best?.iteration ?? null,
   };
 }
 
@@ -277,11 +316,11 @@ type RunOutcome = "clean" | "exhausted" | "revision-failed" | "aborted" | "gener
 const OUTCOME_NOTES: Record<RunOutcome, string> = {
   clean: "Final render passed critique with zero errors.",
   exhausted:
-    "Revision budget exhausted — final.mp4 is the last render; unresolved issues are in the last iteration's critique.md.",
+    "Revision budget exhausted — final.mp4 is the best-scoring render (fewest errors, then fewest warnings, then earliest on a tie), not necessarily the last; unresolved issues are in its iteration's critique.md.",
   "revision-failed":
-    "Revision never passed validation — final.mp4 is the last render; the critique it did not absorb is in the last iteration's critique.md.",
+    "Revision never passed validation — final.mp4 is the best-scoring render so far; the critique it did not absorb is in its iteration's critique.md.",
   aborted:
-    "Run aborted by an error mid-iteration — final.mp4 (when present) is the last COMPLETED render; the run directory is resumable by hand.",
+    "Run aborted by an error mid-iteration — final.mp4 (when present) is the best-scoring COMPLETED render; the run directory is resumable by hand.",
   "generation-failed": "Run failed before rendering.",
 };
 
@@ -292,6 +331,7 @@ async function writeReport(
   iterations: IterationSummary[],
   outcome: RunOutcome,
   rendered: boolean,
+  shippedIteration: number | null,
 ): Promise<void> {
   const lines = [
     "# motife run report",
@@ -301,9 +341,10 @@ async function writeReport(
     `- generate attempts: ${generateAttempts}${rendered ? "" : " (never produced a valid document)"}`,
   ];
   for (const summary of iterations) {
+    const marker = summary.iteration === shippedIteration ? " (shipped as final.mp4)" : "";
     lines.push(
       `- iteration ${summary.iteration}: ${summary.errors} error(s), ` +
-        `${summary.warnings} warning(s) — see iterations/iter-${summary.iteration}/critique.md`,
+        `${summary.warnings} warning(s)${marker} — see iterations/iter-${summary.iteration}/critique.md`,
     );
   }
   lines.push("", OUTCOME_NOTES[outcome]);
