@@ -1,7 +1,7 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** review
+**Status:** in-progress
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-4/camera-clamp` | N/A |  |
+| `motife` | TBD | N/A |  |
 
 ## Background & goals
 
@@ -165,7 +165,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 |---|---|---|---|---|
 | 0 | progress 追蹤 | This progress item; motife-plan.md Phase 4 acceptance criterion added | No | done ([#12](https://github.com/FWcloud916/motife/pull/12)) |
 | 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | done ([#13](https://github.com/FWcloud916/motife/pull/13)) |
-| 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | review ([#14](https://github.com/FWcloud916/motife/pull/14)) |
+| 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | done ([#14](https://github.com/FWcloud916/motife/pull/14)) |
 | 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram + `validate.ts` estimated-footprint lint (moves the signal into the generate retry loop, which the LLM *can* act on) **+ optional hardening**: a `camera`-with-tall-siblings density lint — the clipping itself is fixed in PR 2 via the measured viewport; what remains is a legibility question (a cramped Camera now renders complete-but-small) | Yes | not started |
 | 4 | TTS model wiring + A/B | `--tts-model`/`MOTIFE_TTS_MODEL` + narration-hash includes model; OpenAI voices/instructions **and** ElevenLabs zh voice both evaluated | Audio re-synthesis only | not started |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
@@ -204,6 +204,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 2 implemented: extracted Camera.tsx's zoom/pan math into pure src/components/Camera/cameraMath.ts (zoom clamp per shot against its focus rect + margin; translation clamp per frame against the overall content bounds, post-lerp). 27 unit tests. pnpm verify green (223 tests). IMPORTANT finding during regression verification: live-inspected the actual DOM transform in Remotion Studio at db-index's wide shot -- matches the hand-computed clamp exactly (0.7933x, correctly fitting the 1200px-tall diagram into the 1920x1080 assumption) -- but the still-rendered frame still clips the leaf/table rows, because Camera's ACTUAL rendered box in that scene is ~1728x541px (Scene header/caption clearance + a sibling steps card above it in the same Stack), not the 1920x1080 useVideoConfig() figure Camera's math assumes. This is pre-existing (identical on pre-PR-2 code), already documented in docs/component-library.md's Camera section and its Phase 3 open-items list, and IS the real mechanism behind failure mode 2 -- more precisely diagnosed now. Full writeup + recommendation (a validate.ts rule, folded into PR 3) added to this item's Background section.
 - PR 2 opened: https://github.com/FWcloud916/motife/pull/14 (branch phase-4/camera-clamp).
 - PR 2 follow-up (user review: the PR should actually fix the camera problem, not just the math half): Camera now measures its real wrapper box via the proven CameraTarget pattern (fontsReady gate + eager delayRender handle + per-commit re-measure with dedupe) and runs both clamps against the measured viewport; useVideoConfig() remains only as the never-screenshotted pre-measurement fallback. Re-rendered db-index stills: wide shot now shows the complete tree (was: leaf/table rows clipped), Table Row close-up fully framed (was: mostly off-frame), gallery CameraDemo final frame correct. pnpm verify green. docs/component-library.md Camera section rewritten (measured viewport, remaining legibility caveat); the PR 3 validate.ts rule is downgraded from primary fix to optional density-lint hardening.
+- PR 2 merged: https://github.com/FWcloud916/motife/pull/14 (merge commit 86b5bac). This session's scope (PR 0-2) is complete; next up is PR 3 (Diagram overflow bounding + validate.ts lints) in a future session. User policy update: pure progress-tracking closeout commits go directly to main from now on, no PR.
 
 ## Outcome
 

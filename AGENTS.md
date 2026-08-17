@@ -4,7 +4,7 @@ An AI agent system that turns a technical concept description into a motion-grap
 
 ## Hard constraints
 
-- MUST use a feature branch and open a PR into `main`; MUST NOT commit directly to `main` (source: user-stated delivery policy)
+- MUST use a feature branch and open a PR into `main`; MUST NOT commit directly to `main` — with one exception: a commit that ONLY updates progress-tracking closeout state (`progress/` status flips, work-log entries, PR links after a merge) MAY go directly to `main` without a PR (source: user-stated delivery policy, exception stated 2026-08-17)
 - DSL schema MUST NOT include CSS-like concepts (`className`, `boxShadow`, raw coordinates) — only semantic fields (source: motife-plan.md §2 決策2)
 - Layout MUST be computed by ELK/dagre; the LLM MUST NOT emit coordinates (source: motife-plan.md §2 決策3)
 - The narration timeline MUST be TTS-driven: audio is generated first, frame counts derived from it — never the reverse (source: motife-plan.md §2 決策4)
