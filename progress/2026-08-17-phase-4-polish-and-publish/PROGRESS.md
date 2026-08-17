@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-4/keep-best-iteration` | N/A |  |
+| `motife` | `phase-4/camera-clamp` | N/A |  |
 
 ## Background & goals
 
@@ -78,6 +78,71 @@ rendering layer (版面/旁白), consistent with motife-plan.md §2 分層原則
   critique archival) + PR 2 (Camera clamp). PRs 3-8 are follow-on work,
   tracked below but not started.
 
+### Deeper finding from PR 2 verification: Camera's viewport assumption is violated in db-index itself
+
+PR 2 (`src/components/Camera/cameraMath.ts`) makes Camera's zoom/translation math
+internally correct against ITS OWN stated contract: it clamps a shot's zoom so
+its focus rect fits `useVideoConfig()`'s width/height (with margin), and clamps
+translation so the overall content bounds never pan into dead space *within that
+same 1920×1080 assumption*. Verified both by unit tests (`cameraMath.test.ts`,
+27 cases) and, live, by inspecting the actual DOM transform in Remotion Studio
+at the db-index walkthrough's wide shot (frame 594): `translate(656.153px,
+64px) scale(0.793333)` — matches the hand-computed clamp exactly (the 1200px-
+tall diagram × 0.7933 = 952px, fitting the 1080 − 2×64 margin box).
+
+**But the still-rendered frame at that same point does not show the whole
+diagram** — only root + 2 internal nodes; the leaf/table rows are clipped.
+Root cause, confirmed by measuring the actual DOM box Camera renders into
+(`offsetWidth`/`offsetHeight`, unaffected by CSS transforms): **Camera's real
+box in db-index's `walkthrough` scene is ~1728×541px, not 1920×1080.** Scene.tsx
+reserves `HEADER_CLEARANCE` (210px) + `CAPTION_CLEARANCE` (150px) around
+`content` for this scene's header/caption (1920×720 remains), and inside that,
+db-index's DSL stacks a "steps" progress card *above* the `camera` node in the
+same vertical Stack — the steps card's own height (~172px) further shrinks
+Camera's actual box to ~541px tall. Camera's `useVideoConfig()`-based math has
+no way to know this: it computes correctly for a *1920×1080* canvas, then
+`overflow: hidden` on a box that's actually only *541px tall* clips whatever
+falls outside that regardless of how correct the 1080-based math was.
+
+This is **not a regression from PR 2** — it reproduces identically on the
+pre-PR-2 code path too (verified: the "root, medium" shot's zoom was never
+near its clamp threshold, so PR 2 changes nothing about its position, and the
+same still-render shows the Internal row's top edges clipped at the bottom of
+that shot too). It is also **not undiscovered** —
+`docs/component-library.md`'s `Camera` section already documents "Assumes it
+fills the full composition frame... **This is load-bearing, not a soft
+preference**" plus a real repro note from "authoring the DB index video's
+first narrative Camera use", and lists it under "Open items for Phase 3":
+*"`src/compiler/validate.ts` doesn't currently catch this — worth a
+validation rule if Phase 3's critique loop finds it recurring."* It recurred
+— this IS the mechanism behind Phase 3's failure mode #2, more precisely
+diagnosed than the original eval report could tell from render output alone.
+
+**Resolution (folded into PR 2 after user review):** the initial PR 2 cut
+deferred this to a PR 3 `validate.ts` rule to keep the diff scoped, but the
+user correctly pushed back — PR 2's purpose is to fix the camera failure
+mode, and math-layer clamps alone leave the user-visible clipping in place.
+So PR 2 now also makes Camera measure its REAL box (wrapper
+`offsetWidth`/`offsetHeight`) and run the clamps against that, using the
+exact DOM-measurement discipline `CameraTarget` already proved safe:
+`fontsReady()` gate (fonts are the only async resource that moves layout),
+an eagerly-taken `delayRender` handle so no frame is captured before the
+first post-fonts measurement, re-measure every commit with dedupe.
+`useVideoConfig()` survives only as the never-screenshotted pre-measurement
+fallback. Verified by re-rendered stills: db-index's wide shot now shows
+the complete tree (root→internal×2→leaf×2→Table Row, no clipping), the
+Table Row close-up — previously mostly off-frame — is perfectly framed, and
+ComponentGallery's CameraDemo final frame is correctly framed in its real
+1728×774 box.
+
+**What genuinely remains for PR 3+ (legibility, not correctness):** a
+cramped Camera now renders complete-but-*small* (db-index's wide shot fits
+the whole 766×1200 tree into a ~541px-tall box ≈ 0.34×). Whether that
+layout choice is legible is a DSL-authoring question — a `validate.ts`
+density lint (warn when a `camera` shares a Stack with tall siblings)
+remains worth adding alongside the planned Diagram footprint lint, now as
+quality hardening rather than the primary fix.
+
 ### Proposed Phase 4 acceptance criterion
 
 motife-plan.md §3 Phase 4 has no 驗收 line today (a gap vs. Phases 0-3).
@@ -99,9 +164,9 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | # | PR | Content | Baseline re-render required? | Status |
 |---|---|---|---|---|
 | 0 | progress 追蹤 | This progress item; motife-plan.md Phase 4 acceptance criterion added | No | done ([#12](https://github.com/FWcloud916/motife/pull/12)) |
-| 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | review |
-| 2 | Camera clamp | Zoom upper-bound converges to fit + per-frame translation clamp (fixes failure mode 2 + the Camera-nested half of mode 1) | **Yes** | not started |
-| 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram + `validate.ts` estimated-footprint lint (moves the signal into the generate retry loop, which the LLM *can* act on) | Yes | not started |
+| 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | done ([#13](https://github.com/FWcloud916/motife/pull/13)) |
+| 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | review ([#14](https://github.com/FWcloud916/motife/pull/14)) |
+| 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram + `validate.ts` estimated-footprint lint (moves the signal into the generate retry loop, which the LLM *can* act on) **+ optional hardening**: a `camera`-with-tall-siblings density lint — the clipping itself is fixed in PR 2 via the measured viewport; what remains is a legibility question (a cramped Camera now renders complete-but-small) | Yes | not started |
 | 4 | TTS model wiring + A/B | `--tts-model`/`MOTIFE_TTS_MODEL` + narration-hash includes model; OpenAI voices/instructions **and** ElevenLabs zh voice both evaluated | Audio re-synthesis only | not started |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
@@ -119,11 +184,12 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 1 — `docs/agent-pipeline.md` run-dir contract update + Last-updated bump
 - [x] PR 1 — Tests: 1→2→1 ships iter 1, 2→1 ships iter 2, clean-first unchanged
 - [x] PR 1 — `pnpm verify` green, open PR
-- [ ] PR 2 — Extract `Camera.tsx` math into pure `cameraMath.ts`; zoom clamp (fit-bounded) + translation clamp (post-lerp)
-- [ ] PR 2 — `docs/component-library.md` Camera section update + Last-updated bump
-- [ ] PR 2 — Unit tests: zoom clamp, translation clamp, centering, lerp continuity
-- [ ] PR 2 — Full regression: `pnpm verify`, `manifest.test.ts` frame pins green, re-render 3 baseline DSL docs + visual check (db-index Camera shot fully in-frame, jwt-auth near-unchanged), record check in this item
-- [ ] PR 2 — Open PR
+- [x] PR 2 — Extract `Camera.tsx` math into pure `cameraMath.ts`; zoom clamp (fit-bounded) + translation clamp (post-lerp)
+- [x] PR 2 — `docs/component-library.md` Camera section update + Last-updated bump
+- [x] PR 2 — Unit tests: zoom clamp, translation clamp, centering, lerp continuity (27 cases in `cameraMath.test.ts`)
+- [x] PR 2 — Full regression (first cut): `pnpm verify` green, frame pins green, re-rendered db-index stills + live Studio DOM inspection — math verified correct against the assumed 1920×1080, but db-index's wide shot still clipped → deeper viewport-assumption cause diagnosed (see finding above)
+- [x] PR 2 — Open PR
+- [x] PR 2 (follow-up after user review) — Camera measures its real box (`fontsReady` + `delayRender` + per-commit re-measure with dedupe, the proven CameraTarget pattern) and clamps against it; re-rendered stills confirm db-index wide shot shows the complete tree, Table Row close-up fully framed, gallery CameraDemo correct; `pnpm verify` green again
 
 ## Work log
 
@@ -134,6 +200,10 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 0 opened: https://github.com/FWcloud916/motife/pull/12 (branch phase-4/progress-tracking-kickoff) -- motife-plan.md Phase 4 acceptance criterion added, Phase 3 Outcome placeholder fixed, this progress item created. progress/ tracker check passes. PR 1 and PR 2 will each get their own branch/PR once this one merges.
 - PR 1 implemented: pipeline.ts tracks best-scoring iteration (fewest errors, then warnings, then earliest on a tie) and ships it as final.mp4/doc.final.json instead of always the last render; per-iteration doc.json snapshots added to rundir.ts; IterationSummary carries critique issues, inlined into eval.ts's report.md. Tests: 3 new/updated pipeline.test.ts cases covering tie-break-to-earlier, regression-then-recovery (1->2->1), and strict-improvement (2->1) scenarios, plus rundir.test.ts field coverage. docs/agent-pipeline.md run-dir contract + critique-loop section updated, Last-updated bumped. pnpm verify green (196 tests, keyless).
 - PR 1 opened: https://github.com/FWcloud916/motife/pull/13 (branch phase-4/keep-best-iteration).
+- PR 1 merged: https://github.com/FWcloud916/motife/pull/13. Starting PR 2 (Camera clamp) on branch phase-4/camera-clamp.
+- PR 2 implemented: extracted Camera.tsx's zoom/pan math into pure src/components/Camera/cameraMath.ts (zoom clamp per shot against its focus rect + margin; translation clamp per frame against the overall content bounds, post-lerp). 27 unit tests. pnpm verify green (223 tests). IMPORTANT finding during regression verification: live-inspected the actual DOM transform in Remotion Studio at db-index's wide shot -- matches the hand-computed clamp exactly (0.7933x, correctly fitting the 1200px-tall diagram into the 1920x1080 assumption) -- but the still-rendered frame still clips the leaf/table rows, because Camera's ACTUAL rendered box in that scene is ~1728x541px (Scene header/caption clearance + a sibling steps card above it in the same Stack), not the 1920x1080 useVideoConfig() figure Camera's math assumes. This is pre-existing (identical on pre-PR-2 code), already documented in docs/component-library.md's Camera section and its Phase 3 open-items list, and IS the real mechanism behind failure mode 2 -- more precisely diagnosed now. Full writeup + recommendation (a validate.ts rule, folded into PR 3) added to this item's Background section.
+- PR 2 opened: https://github.com/FWcloud916/motife/pull/14 (branch phase-4/camera-clamp).
+- PR 2 follow-up (user review: the PR should actually fix the camera problem, not just the math half): Camera now measures its real wrapper box via the proven CameraTarget pattern (fontsReady gate + eager delayRender handle + per-commit re-measure with dedupe) and runs both clamps against the measured viewport; useVideoConfig() remains only as the never-screenshotted pre-measurement fallback. Re-rendered db-index stills: wide shot now shows the complete tree (was: leaf/table rows clipped), Table Row close-up fully framed (was: mostly off-frame), gallery CameraDemo final frame correct. pnpm verify green. docs/component-library.md Camera section rewritten (measured viewport, remaining legibility caveat); the PR 3 validate.ts rule is downgraded from primary fix to optional density-lint hardening.
 
 ## Outcome
 

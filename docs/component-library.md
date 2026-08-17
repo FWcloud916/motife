@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Anyone extending `src/components/`; whoever maintains `src/compiler/render/nodes.tsx`
-> **Last updated:** 2026-08-13
+> **Last updated:** 2026-08-17
 >
 > The Phase 1 deliverable (motife-plan.md §3 Phase 1), extended in Phase 2
 > (motife-plan.md §3 Phase 2) with four more semantic primitives
@@ -449,15 +449,46 @@ interface CameraProps {
 }
 ```
 
-Assumes it fills the full composition frame — its viewport size comes from
-Remotion's `useVideoConfig()`, not a DOM measurement. **This is
-load-bearing, not a soft preference:** the pan/zoom transform centers on
-the composition's own width/height regardless of what box actually
-contains the `<Camera>`, so nesting it inside a narrower sibling (e.g. half
-a row's width, beside a steps list) breaks framing outright — confirmed by
-a real repro while authoring the DB index video's first narrative Camera
-use. Give `<Camera>` the full scene content width; put an accompanying
-step list *above or below* it, never *beside* it.
+Frames against its own **measured** box — the wrapper's real
+`offsetWidth`/`offsetHeight`, not `useVideoConfig()`'s composition size.
+This matters because a Camera almost never actually gets the full frame:
+`Scene` reserves header/caption clearance, and any sibling sharing its
+Stack (a steps card above it, say) shrinks the box further. An earlier
+version assumed the full composition frame to avoid DOM measurement, and
+that assumption — not the zoom/pan math — was the real mechanism behind
+the Phase 3 db-index eval's "Camera 運鏡超出畫面範圍" failure mode: math
+computed for 1920×1080 was silently clipped by the wrapper's own
+`overflow: hidden` on a ~1728×541 box. The measurement is safe for the
+same reasons `CameraTarget`'s is (below): gated on `fontsReady()`, held by
+an eagerly-taken `delayRender` handle until the first post-fonts
+measurement lands, re-measured every commit with a dedupe.
+`useVideoConfig()` survives only as the never-screenshotted
+pre-measurement fallback and the `focus: "all"` rect default.
+
+The zoom/translation math (`src/components/Camera/cameraMath.ts`, split out
+of `Camera.tsx` in Phase 4 for node-level testability) applies two clamps on
+top of the naive "center the focus rect and scale" behavior, both bounded
+against that measured viewport:
+
+- **Zoom clamp** (per shot, before interpolation): a shot's nominal zoom
+  (`wide`/`medium`/`close` → `1`/`1.4`/`2`) is capped so its OWN focus rect,
+  plus a `tokens.spacing.lg` margin, never exceeds the viewport — `zoom:
+  "wide"` on a diagram wider than the box now shrinks below `1` instead of
+  overflowing at it.
+- **Translation clamp** (per frame, after interpolation): the resulting pan
+  is bounded so the OVERALL content bounds (the registered
+  `DIAGRAM_BOUNDS_ID` rect, or the union of registered `CameraTarget`s) never
+  scroll their own edges into dead background — a close-up near a diagram's
+  edge no longer reveals empty space past it. Content smaller than the
+  viewport at the current zoom is centered instead (nothing to clamp
+  against).
+
+One composition caveat survives the measured viewport: a Camera squeezed
+into a very small box now shows everything, *scaled to fit* — a `wide`
+shot of a tall diagram inside a cramped Stack renders complete but tiny.
+Legibility of that layout choice is the DSL author's (or a future
+`validate.ts` density lint's) problem; Camera's contract is only that
+framing never clips or pans off the content.
 
 `<CameraTarget id>` registers a non-Diagram child's box as a focusable
 target by id (fallback path for content a nested `Diagram` doesn't already
@@ -542,11 +573,18 @@ catches a defect both current candidates share.
   node union — structured-output APIs vary in `$ref` support. May need
   depth-limited flattening before it can be handed to an LLM call directly;
   not yet attempted (see docs/dsl-schema.md).
-- **`Camera`'s full-composition-frame assumption** (see `Camera` above) is
-  a real constraint an LLM-authored document could easily violate (nesting
-  a `camera` node inside a narrower Stack reads as legal DSL and fails only
-  visually). `src/compiler/validate.ts` doesn't currently catch this —
-  worth a validation rule if Phase 3's critique loop finds it recurring.
+- **`Camera`'s full-composition-frame assumption — RESOLVED in Phase 4.**
+  The Phase 3 concern ("nesting a `camera` node inside a narrower Stack
+  reads as legal DSL and fails only visually") recurred as the db-index
+  eval's "Camera 運鏡超出畫面範圍" failure mode: the `walkthrough` scene's
+  `camera` shares its Stack with a "steps" card, shrinking Camera's actual
+  box to ~1728×541 against the assumed 1920×1080. Fixed at the component
+  layer — Camera now measures its real box (see `Camera` above) — so a
+  cramped Camera renders complete-but-small instead of clipped. What
+  remains is a *legibility* question, not a correctness one: a
+  `validate.ts` density lint (warn when a `camera` shares a Stack with
+  tall siblings) is still worth considering alongside the planned Diagram
+  footprint lint; see `progress/2026-08-17-phase-4-polish-and-publish/`.
 - No open items carried over from Phase 1 — those (Diagram node measuring,
   CameraTarget measurement, transition overlap math, barrel-import
   enforcement) were all closed before Phase 2 began. The barrel rule is

@@ -1,55 +1,19 @@
 import type { FC, ReactNode } from "react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  cancelRender,
-  continueRender,
-  delayRender,
-  interpolate,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
-import { clampExtrapolate } from "../motion/progress";
+import { cancelRender, continueRender, delayRender, useCurrentFrame, useVideoConfig } from "remotion";
 import { resolveWindow } from "../motion/timing";
-import type { FrameRange } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
-import { easing, fontsReady } from "../tokens";
-import type { Window } from "../tokens";
-import { CameraRegistryContext, DIAGRAM_BOUNDS_ID } from "./CameraRegistryContext";
+import { fontsReady } from "../tokens";
+import { CameraRegistryContext } from "./CameraRegistryContext";
 import type { TargetRect } from "./CameraRegistryContext";
+import { focusRectFor, resolveCameraTransform } from "./cameraMath";
+import type { CameraShot } from "./cameraMath";
 
-type Focus = { node: string } | { target: string } | "all";
-
-export interface CameraShot {
-  /** When the camera arrives at this shot's focus, as a fraction of the
-   * enclosing Scene's duration. The camera holds the previous shot's
-   * position until `window.from`, eases across `[from, to]`, then holds. */
-  window: Window;
-  focus: Focus;
-  zoom?: "wide" | "medium" | "close";
-}
+export type { CameraShot } from "./cameraMath";
 
 export interface CameraProps {
   shots: CameraShot[];
   children: ReactNode;
-}
-
-const ZOOM_SCALE: Record<NonNullable<CameraShot["zoom"]>, number> = {
-  wide: 1,
-  medium: 1.4,
-  close: 2,
-};
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-function lerpRect(a: TargetRect, b: TargetRect, t: number): TargetRect {
-  return {
-    x: lerp(a.x, b.x, t),
-    y: lerp(a.y, b.y, t),
-    width: lerp(a.width, b.width, t),
-    height: lerp(a.height, b.height, t),
-  };
 }
 
 /**
@@ -138,61 +102,74 @@ export const CameraTarget: FC<{ id: string; children: ReactNode }> = ({ id, chil
   );
 };
 
-function focusRectFor(
-  focus: Focus,
-  targets: Record<string, TargetRect>,
-  containerSize: { width: number; height: number },
-): TargetRect | null {
-  if (focus === "all") {
-    return targets[DIAGRAM_BOUNDS_ID] ?? { x: 0, y: 0, width: containerSize.width, height: containerSize.height };
-  }
-  if ("node" in focus) return targets[focus.node] ?? null;
-  return targets[focus.target] ?? null;
-}
-
-interface ResolvedTransform {
-  rect: TargetRect;
-  zoom: number;
-}
-
-function currentTransform(
-  frame: number,
-  shots: { shot: CameraShot; range: FrameRange; rect: TargetRect | null }[],
-): ResolvedTransform | null {
-  let prev: ResolvedTransform | null = null;
-  for (const { shot, range, rect } of shots) {
-    if (!rect) continue;
-    const zoom = ZOOM_SCALE[shot.zoom ?? "medium"];
-    if (frame < range.startFrame) {
-      return prev ?? { rect, zoom };
-    }
-    if (frame <= range.endFrame) {
-      const t = easing.emphasize(
-        interpolate(frame, [range.startFrame, range.endFrame], [0, 1], clampExtrapolate),
-      );
-      const from = prev ?? { rect, zoom };
-      return { rect: lerpRect(from.rect, rect, t), zoom: lerp(from.zoom, zoom, t) };
-    }
-    prev = { rect, zoom };
-  }
-  return prev;
-}
-
 // A camera "zoom/pan/focus" primitive isn't a Remotion built-in — this is
 // the idiomatic approach: a wrapper div whose transform is driven off
-// resolved target rects, applied to everything passed as `children`.
+// resolved target rects, applied to everything passed as `children`. The
+// zoom/translation math (including the clamps that keep a shot's target,
+// and the overall content, from panning off frame) lives in cameraMath.ts.
 //
-// Assumes Camera fills the full composition frame (the common case: a
-// Scene's content, full-bleed). Its own viewport size comes from
-// useVideoConfig() — synchronous and exact on the very first render —
-// rather than ref-measuring its wrapper div's clientWidth/clientHeight,
-// for the same reason Diagram's `fit` no longer does: a one-shot DOM
-// measurement can observe a stale, too-small size before Remotion's
-// headless Chrome finishes settling the surrounding layout.
+// The viewport the math frames against is Camera's own MEASURED box, not
+// useVideoConfig()'s composition size. An earlier version assumed the
+// full composition frame to avoid DOM measurement (a naive one-shot
+// clientWidth read can observe a stale pre-layout size — the bug that
+// made Diagram's original `fit` non-deterministic), but in practice a
+// Camera almost never gets the full frame: Scene reserves header/caption
+// clearance, and a sibling in the same Stack (db-index's steps card, in
+// the eval run that surfaced this) shrinks the box further, so
+// 1080-based framing was silently clipped by the wrapper's own
+// `overflow: hidden`. The measurement here is safe for the same reasons
+// CameraTarget's is (see its doc comment): it's gated on fontsReady()
+// (the only async resource that moves layout), a delayRender handle
+// taken eagerly at mount holds the render until the first post-fonts
+// measurement lands, and the effect re-measures on every commit with a
+// dedupe so the steady state is a no-op. useVideoConfig() remains only
+// as the pre-measurement fallback (never screenshotted) and the
+// `focus: "all"` rect default.
 export const Camera: FC<CameraProps> = ({ shots, children }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useSceneTiming();
-  const { width: containerWidth, height: containerHeight } = useVideoConfig();
+  const { width: compositionWidth, height: compositionHeight } = useVideoConfig();
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [measuredViewport, setMeasuredViewport] = useState<{ width: number; height: number } | null>(
+    null,
+  );
+  const [viewportHandle] = useState(() => delayRender("<Camera> viewport measurement"));
+  const viewportSettled = useRef(false);
+  const settleViewport = useCallback(() => {
+    if (!viewportSettled.current) {
+      viewportSettled.current = true;
+      continueRender(viewportHandle);
+    }
+  }, [viewportHandle]);
+
+  // Deliberately no dependency array: re-measure after every commit (the
+  // dedupe below makes the steady state a no-op), so anything that
+  // resizes the wrapper later is picked up.
+  useEffect(() => {
+    let cancelled = false;
+    fontsReady()
+      .then(() => {
+        if (cancelled) return;
+        const node = viewportRef.current;
+        if (node && node.offsetWidth > 0 && node.offsetHeight > 0) {
+          const width = node.offsetWidth;
+          const height = node.offsetHeight;
+          setMeasuredViewport((prev) =>
+            prev && prev.width === width && prev.height === height ? prev : { width, height },
+          );
+        }
+        settleViewport();
+      })
+      .catch((error) => cancelRender(error));
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  // Release the handle on unmount so a Camera that unmounts before fonts
+  // settle can't hang the render until the 30s timeout.
+  useEffect(() => settleViewport, [settleViewport]);
 
   const [targets, setTargets] = useState<Record<string, TargetRect>>({});
   const register = useCallback((id: string, rect: TargetRect) => {
@@ -212,29 +189,25 @@ export const Camera: FC<CameraProps> = ({ shots, children }) => {
   }, []);
   const registry = useMemo(() => ({ register }), [register]);
 
-  const containerSize = { width: containerWidth, height: containerHeight };
+  const viewport = measuredViewport ?? { width: compositionWidth, height: compositionHeight };
   const resolvedShots = shots.map((shot) => ({
     shot,
     range: resolveWindow(shot.window, durationInFrames),
-    rect: focusRectFor(shot.focus, targets, containerSize),
+    rect: focusRectFor(shot.focus, targets, viewport),
   }));
-  const transform = currentTransform(frame, resolvedShots);
-
+  const transform = resolveCameraTransform(frame, resolvedShots, targets, viewport);
   const style = transform
-    ? (() => {
-        const cx = transform.rect.x + transform.rect.width / 2;
-        const cy = transform.rect.y + transform.rect.height / 2;
-        const tx = containerWidth / 2 - cx * transform.zoom;
-        const ty = containerHeight / 2 - cy * transform.zoom;
-        return {
-          transform: `translate(${tx}px, ${ty}px) scale(${transform.zoom})`,
-          transformOrigin: "0 0",
-        };
-      })()
+    ? {
+        transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.zoom})`,
+        transformOrigin: "0 0",
+      }
     : {};
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div
+      ref={viewportRef}
+      style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}
+    >
       <CameraRegistryContext.Provider value={registry}>
         <div style={{ position: "absolute", inset: 0, ...style }}>{children}</div>
       </CameraRegistryContext.Provider>
