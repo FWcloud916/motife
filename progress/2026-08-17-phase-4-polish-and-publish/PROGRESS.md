@@ -1,7 +1,7 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** in-progress
+**Status:** review
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-4/kickoff-keep-best-camera-clamp` | N/A |  |
+| `motife` | `phase-4/progress-tracking-kickoff` | N/A | PR 0, [#12](https://github.com/FWcloud916/motife/pull/12); PR 1/PR 2 use their own branches |
 
 ## Background & goals
 
@@ -111,9 +111,9 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 ### This session's tasks (PR 0-2)
 
 - [x] PR 0 — Create this progress item with full Phase 4 breakdown + acceptance criterion
-- [ ] PR 0 — Update motife-plan.md §3 Phase 4 with the acceptance criterion above
-- [ ] PR 0 — Fix Phase 3 progress item's placeholder Outcome section
-- [ ] PR 0 — Open PR (progress/ + motife-plan.md only, no src/ changes)
+- [x] PR 0 — Update motife-plan.md §3 Phase 4 with the acceptance criterion above
+- [x] PR 0 — Fix Phase 3 progress item's placeholder Outcome section
+- [x] PR 0 — Open PR (progress/ + motife-plan.md only, no src/ changes)
 - [ ] PR 1 — `pipeline.ts` keep-best-iteration (track best by errors→warnings→earlier-iteration tiebreak); per-iteration `doc.json` snapshot; `doc.final.json` in run root
 - [ ] PR 1 — `IterationSummary` carries `issues: CritiqueIssue[]`; `eval.ts` inlines them into `report.md`
 - [ ] PR 1 — `docs/agent-pipeline.md` run-dir contract update + Last-updated bump
@@ -131,6 +131,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 
 -
 - Created full Phase 4 breakdown (8 PRs) with baseline re-render requirements, failure-mode queue with per-concept attribution, known deferrals (word-level captions, TreeDiagram, pipeline log persistence), user decisions (TTS A/B both providers, publish-form deferred), and a proposed Phase 4 acceptance criterion. This session scoped to PR 0 (this item) + PR 1 (keep-best/critique archival) + PR 2 (Camera clamp).
+- PR 0 opened: https://github.com/FWcloud916/motife/pull/12 (branch phase-4/progress-tracking-kickoff) -- motife-plan.md Phase 4 acceptance criterion added, Phase 3 Outcome placeholder fixed, this progress item created. progress/ tracker check passes. PR 1 and PR 2 will each get their own branch/PR once this one merges.
 
 ## Outcome
 
