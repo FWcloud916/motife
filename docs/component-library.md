@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Anyone extending `src/components/`; whoever maintains `src/compiler/render/nodes.tsx`
-> **Last updated:** 2026-08-13
+> **Last updated:** 2026-08-17
 >
 > The Phase 1 deliverable (motife-plan.md §3 Phase 1), extended in Phase 2
 > (motife-plan.md §3 Phase 2) with four more semantic primitives
@@ -459,6 +459,29 @@ a real repro while authoring the DB index video's first narrative Camera
 use. Give `<Camera>` the full scene content width; put an accompanying
 step list *above or below* it, never *beside* it.
 
+The zoom/translation math (`src/components/Camera/cameraMath.ts`, split out
+of `Camera.tsx` in Phase 4 for node-level testability) applies two clamps on
+top of the naive "center the focus rect and scale" behavior, both bounded
+against that same `useVideoConfig()` viewport:
+
+- **Zoom clamp** (per shot, before interpolation): a shot's nominal zoom
+  (`wide`/`medium`/`close` → `1`/`1.4`/`2`) is capped so its OWN focus rect,
+  plus a `tokens.spacing.lg` margin, never exceeds the viewport — `zoom:
+  "wide"` on a diagram wider than the frame now shrinks below `1` instead of
+  overflowing at it.
+- **Translation clamp** (per frame, after interpolation): the resulting pan
+  is bounded so the OVERALL content bounds (the registered
+  `DIAGRAM_BOUNDS_ID` rect, or the union of registered `CameraTarget`s) never
+  scroll their own edges into dead background — a close-up near a diagram's
+  edge no longer reveals empty space past it. Content smaller than the
+  viewport at the current zoom is centered instead (nothing to clamp
+  against).
+
+**Neither clamp corrects for a box smaller than the assumed 1920×1080** —
+see the Phase 3 open item below, now confirmed (not just theorized) as
+db-index's actual failure mechanism; tracked with a fix recommendation in
+`progress/2026-08-17-phase-4-polish-and-publish/`.
+
 `<CameraTarget id>` registers a non-Diagram child's box as a focusable
 target by id (fallback path for content a nested `Diagram` doesn't already
 know about — prefer `focus: { node }` when the subject is a Diagram node).
@@ -547,6 +570,12 @@ catches a defect both current candidates share.
   a `camera` node inside a narrower Stack reads as legal DSL and fails only
   visually). `src/compiler/validate.ts` doesn't currently catch this —
   worth a validation rule if Phase 3's critique loop finds it recurring.
+  **Confirmed, not just theorized:** it recurred — Phase 3's db-index eval
+  run's "Camera 運鏡超出畫面範圍" failure mode is exactly this (the
+  `walkthrough` scene's `camera` node shares its Stack with a "steps"
+  progress card above it, shrinking Camera's actual box to ~1728×541 against
+  an assumed 1920×1080). See `progress/2026-08-17-phase-4-polish-and-publish/`
+  for the diagnosis and a `validate.ts`-rule recommendation.
 - No open items carried over from Phase 1 — those (Diagram node measuring,
   CameraTarget measurement, transition overlap math, barrel-import
   enforcement) were all closed before Phase 2 began. The barrel rule is

@@ -1,55 +1,19 @@
 import type { FC, ReactNode } from "react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  cancelRender,
-  continueRender,
-  delayRender,
-  interpolate,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
-import { clampExtrapolate } from "../motion/progress";
+import { cancelRender, continueRender, delayRender, useCurrentFrame, useVideoConfig } from "remotion";
 import { resolveWindow } from "../motion/timing";
-import type { FrameRange } from "../motion/timing";
 import { useSceneTiming } from "../Scene/SceneContext";
-import { easing, fontsReady } from "../tokens";
-import type { Window } from "../tokens";
-import { CameraRegistryContext, DIAGRAM_BOUNDS_ID } from "./CameraRegistryContext";
+import { fontsReady } from "../tokens";
+import { CameraRegistryContext } from "./CameraRegistryContext";
 import type { TargetRect } from "./CameraRegistryContext";
+import { focusRectFor, resolveCameraTransform } from "./cameraMath";
+import type { CameraShot } from "./cameraMath";
 
-type Focus = { node: string } | { target: string } | "all";
-
-export interface CameraShot {
-  /** When the camera arrives at this shot's focus, as a fraction of the
-   * enclosing Scene's duration. The camera holds the previous shot's
-   * position until `window.from`, eases across `[from, to]`, then holds. */
-  window: Window;
-  focus: Focus;
-  zoom?: "wide" | "medium" | "close";
-}
+export type { CameraShot } from "./cameraMath";
 
 export interface CameraProps {
   shots: CameraShot[];
   children: ReactNode;
-}
-
-const ZOOM_SCALE: Record<NonNullable<CameraShot["zoom"]>, number> = {
-  wide: 1,
-  medium: 1.4,
-  close: 2,
-};
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-function lerpRect(a: TargetRect, b: TargetRect, t: number): TargetRect {
-  return {
-    x: lerp(a.x, b.x, t),
-    y: lerp(a.y, b.y, t),
-    width: lerp(a.width, b.width, t),
-    height: lerp(a.height, b.height, t),
-  };
 }
 
 /**
@@ -138,49 +102,11 @@ export const CameraTarget: FC<{ id: string; children: ReactNode }> = ({ id, chil
   );
 };
 
-function focusRectFor(
-  focus: Focus,
-  targets: Record<string, TargetRect>,
-  containerSize: { width: number; height: number },
-): TargetRect | null {
-  if (focus === "all") {
-    return targets[DIAGRAM_BOUNDS_ID] ?? { x: 0, y: 0, width: containerSize.width, height: containerSize.height };
-  }
-  if ("node" in focus) return targets[focus.node] ?? null;
-  return targets[focus.target] ?? null;
-}
-
-interface ResolvedTransform {
-  rect: TargetRect;
-  zoom: number;
-}
-
-function currentTransform(
-  frame: number,
-  shots: { shot: CameraShot; range: FrameRange; rect: TargetRect | null }[],
-): ResolvedTransform | null {
-  let prev: ResolvedTransform | null = null;
-  for (const { shot, range, rect } of shots) {
-    if (!rect) continue;
-    const zoom = ZOOM_SCALE[shot.zoom ?? "medium"];
-    if (frame < range.startFrame) {
-      return prev ?? { rect, zoom };
-    }
-    if (frame <= range.endFrame) {
-      const t = easing.emphasize(
-        interpolate(frame, [range.startFrame, range.endFrame], [0, 1], clampExtrapolate),
-      );
-      const from = prev ?? { rect, zoom };
-      return { rect: lerpRect(from.rect, rect, t), zoom: lerp(from.zoom, zoom, t) };
-    }
-    prev = { rect, zoom };
-  }
-  return prev;
-}
-
 // A camera "zoom/pan/focus" primitive isn't a Remotion built-in — this is
 // the idiomatic approach: a wrapper div whose transform is driven off
-// resolved target rects, applied to everything passed as `children`.
+// resolved target rects, applied to everything passed as `children`. The
+// zoom/translation math (including the clamps that keep a shot's target,
+// and the overall content, from panning off frame) lives in cameraMath.ts.
 //
 // Assumes Camera fills the full composition frame (the common case: a
 // Scene's content, full-bleed). Its own viewport size comes from
@@ -218,19 +144,12 @@ export const Camera: FC<CameraProps> = ({ shots, children }) => {
     range: resolveWindow(shot.window, durationInFrames),
     rect: focusRectFor(shot.focus, targets, containerSize),
   }));
-  const transform = currentTransform(frame, resolvedShots);
-
+  const transform = resolveCameraTransform(frame, resolvedShots, targets, containerSize);
   const style = transform
-    ? (() => {
-        const cx = transform.rect.x + transform.rect.width / 2;
-        const cy = transform.rect.y + transform.rect.height / 2;
-        const tx = containerWidth / 2 - cx * transform.zoom;
-        const ty = containerHeight / 2 - cy * transform.zoom;
-        return {
-          transform: `translate(${tx}px, ${ty}px) scale(${transform.zoom})`,
-          transformOrigin: "0 0",
-        };
-      })()
+    ? {
+        transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.zoom})`,
+        transformOrigin: "0 0",
+      }
     : {};
 
   return (
