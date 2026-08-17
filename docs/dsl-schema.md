@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Whoever writes Phase 3's system prompt; anyone hand-authoring a DSL document
-> **Last updated:** 2026-08-14
+> **Last updated:** 2026-08-17
 >
 > The Phase 2 deliverable (motife-plan.md §3 Phase 2). This doc's content is
 > literally what goes into Phase 3's system prompt — it is written for that
@@ -237,6 +237,18 @@ to show two different topological relationships at once** (e.g. a tree's
 parent/child edges and its leaf-level sibling chain) — dagre routes a
 same-rank sibling edge awkwardly, and forcing it rarely reads as intended.
 
+**Layout budgets** (validated, not just advisory — see the issue codes
+below): keep a diagram to **8 nodes or fewer**; keep each `label`/`detail`
+to roughly **18 full-width (CJK) or 30 half-width characters** — past that
+it wraps onto multiple lines, and well past that (~2× again) the card stops
+growing and the extra lines are cut off, since a node's height stays fixed
+regardless of how much text it holds. Move anything longer into the
+scene's `narration` instead of a node's `detail`. Inside a `camera`, a
+`direction: "down"` graph with 4+ ranks of default-size nodes is already
+taller than a typical header+caption scene's content area — prefer
+`direction: "right"` for chains with more than 2-3 steps, or split a deep
+chain across multiple scenes.
+
 ### Code / Terminal
 
 ```ts
@@ -268,14 +280,16 @@ type CameraNode = { type: "camera"; shots: CameraShot[]; children: DslNode[] }; 
 type CameraTargetNode = { type: "cameraTarget"; id: string; child: DslNode };
 ```
 
-**`Camera` assumes it fills the full composition frame.** Its pan/zoom math
-is keyed off the composition's own width/height (`useVideoConfig()`), not
-whatever box actually contains it — nesting a `camera` node inside a
-narrower sibling (e.g. half the row width, beside a steps list) breaks its
-centering and framing. Give a `camera` node the full scene content width;
-put any accompanying step list *above or below* it (a slim strip), never
-*beside* it. `CameraTarget` ids and a nested `Diagram`'s own node ids share
-one namespace within the same `camera` — don't reuse an id.
+`Camera` frames against the ACTUAL box it renders into (measured, not the
+composition's raw width/height), so it never overflows or clips — but a
+`camera` squeezed into a small box still renders complete-but-*small*,
+which is a legibility problem the LLM can fix and the renderer can't: give
+a `camera` node the full scene content width, and put any accompanying
+step list *above or below* it (a slim strip), never *beside* it — a
+`camera_content_too_tall` warning (see below) fires when a nested diagram's
+own layout is taller than the scene's content area even before anything
+else shares that space. `CameraTarget` ids and a nested `Diagram`'s own
+node ids share one namespace within the same `camera` — don't reuse an id.
 
 ### Step-track consumers
 
@@ -329,8 +343,12 @@ pasted straight into an LLM retry prompt).
 | `camera_target_shadows_node` | Same as above, phrased for the node-id-first case | `Diagram node id "root" is shadowed by a CameraTarget with the same id — camera focus ids must be unique within one Camera.` |
 | `transition_too_long` | A scene's `transitionToNext` isn't strictly shorter than both neighbouring scenes | `scenes[1].transitionToNext ("fade", 15 frames) is not shorter than scenes[2] (12 frames) — shorten the transition or lengthen scenes[2].durationInSeconds.` |
 | `narration_pacing` (warning) | Narration length implies a pace outside ~0.3×–1.5× a comfortable ~8 chars/sec (Mandarin) | `scenes[1].narration is 128 characters but the scene is 6s — roughly 21 chars/sec, about 2.5x a comfortable pace. fix: shorten to ~50 characters, or raise durationInSeconds to about 16.` |
+| `diagram_label_too_long` (warning) | A node's estimated `label`/`detail` width exceeds ~496px (~18 CJK / ~30 half-width chars) — it will wrap onto multiple lines | `Node "authServer"'s label is estimated at ~520px wide — it will wrap onto multiple lines when rendered.` |
+| `diagram_label_clipped` | Estimated width exceeds ~992px — past 2 wrapped lines, the card doesn't grow taller and the rest is cut off | `Node "authServer"'s detail is estimated at ~1040px wide — past the point where the card's text wraps to 3+ lines and the extra lines get cut off.` |
+| `diagram_too_many_nodes` (warning) | A `graph` has more than 8 nodes | `This diagram has 9 nodes — more than any diagram in the reference examples (max 8) comfortably fits a scene.` |
+| `camera_content_too_tall` (warning) | A diagram nested in a `camera` is estimated taller than the scene's content area, even with nothing else sharing it | `This diagram is estimated at ~1200px tall, taller than the ~720px this scene's content area has even with nothing else in it.` |
 
-All 20 codes above have a table-driven test in `src/compiler/parse.test.ts`
+All 24 codes above have a table-driven test in `src/compiler/parse.test.ts`
 asserting the exact code, path shape, and that `message`/`fix` contain the
 expected substrings — a new code without a matching test case is a compile
 error there (`Record<DslIssueCode, true>` exhaustiveness), not a silent gap.

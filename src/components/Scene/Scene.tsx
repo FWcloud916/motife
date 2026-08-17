@@ -4,6 +4,8 @@ import { clampExtrapolate, reveal } from "../motion/progress";
 import type { Tone } from "../tokens";
 import { tokens } from "../tokens";
 import { Background } from "./Background";
+import { CAPTION_CLEARANCE, CONTENT_EDGE_PAD, HEADER_CLEARANCE, computeSafeArea } from "./safeArea";
+import { SafeAreaContext } from "./SafeAreaContext";
 import { SceneContext } from "./SceneContext";
 
 export interface SceneHeaderSpec {
@@ -24,16 +26,17 @@ export interface SceneProps {
   children?: ReactNode;
 }
 
-// Reserved vertical space around the content area when a header/caption is
-// present — mirrors the Phase 0 scenes' shared convention (header at
-// y=72, content starting around y=250) without every scene re-deriving it.
-const HEADER_CLEARANCE = 210;
-const CAPTION_CLEARANCE = 150;
+// HEADER_CLEARANCE/CAPTION_CLEARANCE live in ./safeArea now — shared with
+// src/compiler/validate.ts's camera-content-height lint via the barrel, so
+// both the renderer and the validator compute the same box from the same
+// numbers. CAPTION_SIDE_MARGIN only styles SceneCaption below and has no
+// validator use, so it stays local.
 const CAPTION_SIDE_MARGIN = 210;
 
 export const Scene: FC<SceneProps> = ({ durationInFrames, background, header, caption, children }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
+  const safeArea = computeSafeArea({ width, height, hasHeader: !!header, hasCaption: !!caption });
 
   return (
     <SceneContext.Provider value={{ durationInFrames, fps }}>
@@ -42,13 +45,13 @@ export const Scene: FC<SceneProps> = ({ durationInFrames, background, header, ca
         {header ? <SceneHeaderBlock frame={frame} {...header} /> : null}
         <AbsoluteFill
           style={{
-            paddingLeft: tokens.spacing.xl,
-            paddingRight: tokens.spacing.xl,
-            paddingTop: header ? HEADER_CLEARANCE : tokens.spacing.xl,
-            paddingBottom: caption ? CAPTION_CLEARANCE : tokens.spacing.xl,
+            paddingLeft: CONTENT_EDGE_PAD,
+            paddingRight: CONTENT_EDGE_PAD,
+            paddingTop: header ? HEADER_CLEARANCE : CONTENT_EDGE_PAD,
+            paddingBottom: caption ? CAPTION_CLEARANCE : CONTENT_EDGE_PAD,
           }}
         >
-          {children}
+          <SafeAreaContext.Provider value={safeArea}>{children}</SafeAreaContext.Provider>
         </AbsoluteFill>
         {caption ? <SceneCaption frame={frame}>{caption}</SceneCaption> : null}
       </AbsoluteFill>

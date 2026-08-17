@@ -1,7 +1,7 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** in-progress
+**Status:** review
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | TBD | N/A |  |
+| `motife` | `phase-4/diagram-overflow-bounding` | N/A |  |
 
 ## Background & goals
 
@@ -166,7 +166,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | 0 | progress 追蹤 | This progress item; motife-plan.md Phase 4 acceptance criterion added | No | done ([#12](https://github.com/FWcloud916/motife/pull/12)) |
 | 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | done ([#13](https://github.com/FWcloud916/motife/pull/13)) |
 | 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | done ([#14](https://github.com/FWcloud916/motife/pull/14)) |
-| 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram + `validate.ts` estimated-footprint lint (moves the signal into the generate retry loop, which the LLM *can* act on) **+ optional hardening**: a `camera`-with-tall-siblings density lint — the clipping itself is fixed in PR 2 via the measured viewport; what remains is a legibility question (a cramped Camera now renders complete-but-small) | Yes | not started |
+| 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram (component-layer guarantee) + 4 `validate.ts` lints: `diagram_label_too_long`/`diagram_label_clipped`(error)/`diagram_too_many_nodes` (estimated text/node-count budgets) + `camera_content_too_tall` (the density-lint hardening — height-only, estimation-immune) | **Yes** | review |
 | 4 | TTS model wiring + A/B | `--tts-model`/`MOTIFE_TTS_MODEL` + narration-hash includes model; OpenAI voices/instructions **and** ElevenLabs zh voice both evaluated | Audio re-synthesis only | not started |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
@@ -190,6 +190,14 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 2 — Full regression (first cut): `pnpm verify` green, frame pins green, re-rendered db-index stills + live Studio DOM inspection — math verified correct against the assumed 1920×1080, but db-index's wide shot still clipped → deeper viewport-assumption cause diagnosed (see finding above)
 - [x] PR 2 — Open PR
 - [x] PR 2 (follow-up after user review) — Camera measures its real box (`fontsReady` + `delayRender` + per-commit re-measure with dedupe, the proven CameraTarget pattern) and clamps against it; re-rendered stills confirm db-index wide shot shows the complete tree, Table Row close-up fully framed, gallery CameraDemo correct; `pnpm verify` green again
+- [x] PR 3 — `src/components/Scene/safeArea.ts` (`computeSafeArea`, shared HEADER_CLEARANCE/CAPTION_CLEARANCE/CONTENT_EDGE_PAD) + `SafeAreaContext`; Scene.tsx provides it (padding values unchanged, now sourced from the shared module)
+- [x] PR 3 — `src/components/layout/estimateNodeSizes.ts` (pure, DOM-free mirror of measureNodes.ts: CJK/fullwidth-aware `estimateTextWidth`, `estimateGraphNodeSizes`); barrel exports for both new modules
+- [x] PR 3 — Diagram.tsx standalone `fit` cap (`maxHeight: safeArea?.height`, `maxWidth: "100%"`) — camera-nested path untouched
+- [x] PR 3 — `validate.ts`: `SceneLayoutBudget` threaded through `validateScene → walkNode → validateCamera/validateSwitch`; `diagram_label_too_long`/`diagram_label_clipped`/`diagram_too_many_nodes` in `validateDiagram`; `camera_content_too_tall` in `validateCamera`'s existing subtree collection (height-only, computeLayout on estimated sizes — estimation-immune since TB height doesn't depend on width estimates)
+- [x] PR 3 — `errors.ts` 4 new `DslIssueCode`s; `parse.test.ts` 4 new CASES + exhaustiveness table; confirmed VALID_DOC fixture stays zero-warning (formatIssues snapshot unchanged)
+- [x] PR 3 — `docs/dsl-schema.md` Diagram "Layout budgets" note + Camera note corrected (was still describing pre-PR-2 behavior) + validation table +4 rows ("All 24 codes") + Last-updated; `docs/component-library.md` Scene/Diagram/Camera sections + "Open items" entries updated to RESOLVED
+- [x] PR 3 — Full verification: `pnpm verify` green (245 tests + smoke + audio smoke); re-rendered baseline stills pixel-identical to pre-PR (cap never binds, verified by eye); `pnpm motife validate` on all 3 baselines — jwt/mq clean, db-index emits exactly the intended `camera_content_too_tall` warning (~1200px vs ~720px, exit 0); synthetic oversized doc demonstrates all 4 new lints firing with actionable non-pixel fix text
+- [x] PR 3 — Open PR
 
 ## Work log
 
@@ -205,6 +213,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 2 opened: https://github.com/FWcloud916/motife/pull/14 (branch phase-4/camera-clamp).
 - PR 2 follow-up (user review: the PR should actually fix the camera problem, not just the math half): Camera now measures its real wrapper box via the proven CameraTarget pattern (fontsReady gate + eager delayRender handle + per-commit re-measure with dedupe) and runs both clamps against the measured viewport; useVideoConfig() remains only as the never-screenshotted pre-measurement fallback. Re-rendered db-index stills: wide shot now shows the complete tree (was: leaf/table rows clipped), Table Row close-up fully framed (was: mostly off-frame), gallery CameraDemo final frame correct. pnpm verify green. docs/component-library.md Camera section rewritten (measured viewport, remaining legibility caveat); the PR 3 validate.ts rule is downgraded from primary fix to optional density-lint hardening.
 - PR 2 merged: https://github.com/FWcloud916/motife/pull/14 (merge commit 86b5bac). This session's scope (PR 0-2) is complete; next up is PR 3 (Diagram overflow bounding + validate.ts lints) in a future session. User policy update: pure progress-tracking closeout commits go directly to main from now on, no PR.
+- PR 3 implemented: safeArea.ts + SafeAreaContext (Scene provides the real content box, no behavior change to existing padding); estimateNodeSizes.ts (pure CJK-aware text-width estimator mirroring measureNodes.ts); Diagram.tsx standalone fit now caps at the safe area (letterbox, never clip; camera-nested untouched); validate.ts gains 4 layout-budget lints threaded via a new SceneLayoutBudget param (diagram_label_too_long/clipped/too_many_nodes on validateDiagram, camera_content_too_tall on validateCamera's existing subtree collection). Calibrated thresholds against real dagre runs + hand-measurement of all 3 baseline docs before writing any code (shrink-factor thresholds were ruled out -- baseline content legitimately sits at 0.34-0.47x; text-width/node-count/camera-height were the clean separators). pnpm verify green (245 tests); baseline smoke stills re-rendered pixel-identical (cap never binds anywhere, as calibrated); pnpm motife validate confirms jwt/mq clean and db-index emits exactly the intended camera_content_too_tall warning; a synthetic oversized doc demonstrated all 4 new lints firing with actionable fix text. docs/dsl-schema.md and docs/component-library.md updated, including fixing a stale pre-PR-2 Camera description in dsl-schema.md noticed along the way.
 
 ## Outcome
 

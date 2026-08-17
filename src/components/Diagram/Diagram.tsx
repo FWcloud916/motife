@@ -10,6 +10,7 @@ import type { NodeSize } from "../layout/nodeSizing";
 import type { GraphSpec } from "../layout/types";
 import { stagger } from "../motion/progress";
 import { resolveWindow } from "../motion/timing";
+import { SafeAreaContext } from "../Scene/SafeAreaContext";
 import { useSceneTiming } from "../Scene/SceneContext";
 import { fontsReady } from "../tokens";
 import type { Measure, Window } from "../tokens";
@@ -109,6 +110,10 @@ export const Diagram: FC<DiagramProps> = ({
     [graph, measuredSizes],
   );
   const { durationInFrames } = useSceneTiming();
+  // Real-pixel cap for the STANDALONE render path below — null outside a
+  // Scene (or before one provides it), in which case there's nothing to
+  // cap against and behavior is unchanged from before this existed.
+  const safeArea = useContext(SafeAreaContext);
 
   // A <Diagram> nested inside a <Camera> hands framing over entirely to
   // the Camera: it registers its node rects (and its own overall bounds,
@@ -223,16 +228,25 @@ export const Diagram: FC<DiagramProps> = ({
   // the SVG element's OWN box to the diagram's aspect ratio at 100% width
   // — a CSS `aspect-ratio`, not preserveAspectRatio, since the latter only
   // fits content inside a box the element already has, it can't resize
-  // the element itself.
+  // the element itself. That growth is unbounded on its own — a graph
+  // wide enough (or, via aspect-ratio, tall enough) relative to its box
+  // can overflow the Scene's content area outright (the Phase 3 "Diagram
+  // 節點卡片過大遭畫面裁切" failure mode). `maxHeight: safeArea?.height`
+  // caps it at the real content box a `<Scene>` actually reserves: since
+  // `aspect-ratio` is only a PREFERRED size, `max-height` wins once it
+  // would be exceeded, and `viewBox` + `preserveAspectRatio="xMidYMid
+  // meet"` then letterboxes (centers, shrunk) instead of clipping.
   const svgSizeStyle =
-    fit === "width" ? { aspectRatio: `${layout.width} / ${layout.height}` } : { height: "100%" };
+    fit === "width"
+      ? { aspectRatio: `${layout.width} / ${layout.height}`, maxHeight: safeArea?.height }
+      : { height: "100%", maxHeight: safeArea?.height };
 
   const svg = (
     <svg
       viewBox={`0 0 ${layout.width} ${layout.height}`}
       preserveAspectRatio="xMidYMid meet"
       width="100%"
-      style={{ display: "block", overflow: "visible", ...svgSizeStyle }}
+      style={{ display: "block", overflow: "visible", maxWidth: "100%", ...svgSizeStyle }}
     >
       <foreignObject x={0} y={0} width={layout.width} height={layout.height}>
         <div style={{ position: "relative", width: layout.width, height: layout.height }}>

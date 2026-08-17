@@ -32,7 +32,14 @@ export type DslIssueCode =
   // timeline
   | "transition_too_long"
   // content quality
-  | "narration_pacing";
+  | "narration_pacing"
+  // layout budgets — estimated (see src/components/layout/estimateNodeSizes.ts);
+  // the critique loop can SEE these but is forbidden from suggesting a
+  // pixel/coordinate fix, so this is the channel that reaches the LLM
+  | "diagram_label_too_long"
+  | "diagram_label_clipped"
+  | "diagram_too_many_nodes"
+  | "camera_content_too_tall";
 
 export type DslIssueSeverity = "error" | "warning";
 

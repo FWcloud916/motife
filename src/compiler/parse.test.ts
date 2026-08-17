@@ -437,6 +437,68 @@ const CASES: ErrorCase[] = [
     messageContains: ["7", "checks"],
     fixContains: ["0 and 1"],
   },
+  {
+    name: "a diagram node's label is long enough to wrap",
+    code: "diagram_label_too_long",
+    severity: "warning",
+    mutate: (doc) => {
+      doc.scenes[1].content.graph.nodes[0].label = "測".repeat(20); // ~520px @ 26px/char
+    },
+    pathIs: "scenes[1].content.graph.nodes[0].label",
+    messageContains: ["wide", "wrap"],
+    fixContains: ["18"],
+  },
+  {
+    name: "a diagram node's label is long enough to clip",
+    code: "diagram_label_clipped",
+    severity: "error",
+    mutate: (doc) => {
+      doc.scenes[1].content.graph.nodes[1].label = "測".repeat(40); // ~1040px @ 26px/char
+    },
+    pathIs: "scenes[1].content.graph.nodes[1].label",
+    messageContains: ["wide", "cut off"],
+    fixContains: ["18"],
+  },
+  {
+    name: "a diagram has more nodes than comfortably fit a scene",
+    code: "diagram_too_many_nodes",
+    severity: "warning",
+    mutate: (doc) => {
+      for (const id of ["c", "d", "e", "f", "g", "h", "i"]) {
+        doc.scenes[1].content.graph.nodes.push({ id, label: id.toUpperCase() });
+      }
+    },
+    pathIs: "scenes[1].content.graph.nodes",
+    messageContains: ["9 nodes"],
+    fixContains: ["split"],
+  },
+  {
+    name: "a camera's nested diagram is taller than the scene's content area",
+    code: "camera_content_too_tall",
+    severity: "warning",
+    mutate: (doc) => {
+      // direction "down", 4 ranks -> estimated height 4*228 + 3*96 = 1200,
+      // taller than the walkthrough scene's ~834px content area (no
+      // header, an omitted caption still reserves CAPTION_CLEARANCE).
+      doc.scenes[2].content.children[3].children[0].graph = {
+        direction: "down",
+        nodes: [
+          { id: "camNode", label: "A" },
+          { id: "x1", label: "B" },
+          { id: "x2", label: "C" },
+          { id: "x3", label: "D" },
+        ],
+        edges: [
+          { from: "camNode", to: "x1" },
+          { from: "x1", to: "x2" },
+          { from: "x2", to: "x3" },
+        ],
+      };
+    },
+    pathIs: "scenes[2].content.children[3].children[0].graph",
+    messageContains: ["px tall"],
+    fixContains: ["direction"],
+  },
 ];
 
 describe("parseDocument — error/warning contract", () => {
@@ -482,6 +544,10 @@ describe("parseDocument — error/warning contract", () => {
       camera_target_shadows_node: true,
       transition_too_long: true,
       narration_pacing: true,
+      diagram_label_too_long: true,
+      diagram_label_clipped: true,
+      diagram_too_many_nodes: true,
+      camera_content_too_tall: true,
     };
     const covered = new Set(CASES.map((c) => c.code));
     for (const code of Object.keys(ALL_CODES) as DslIssueCode[]) {
