@@ -133,6 +133,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - Created full Phase 4 breakdown (8 PRs) with baseline re-render requirements, failure-mode queue with per-concept attribution, known deferrals (word-level captions, TreeDiagram, pipeline log persistence), user decisions (TTS A/B both providers, publish-form deferred), and a proposed Phase 4 acceptance criterion. This session scoped to PR 0 (this item) + PR 1 (keep-best/critique archival) + PR 2 (Camera clamp).
 - PR 0 opened: https://github.com/FWcloud916/motife/pull/12 (branch phase-4/progress-tracking-kickoff) -- motife-plan.md Phase 4 acceptance criterion added, Phase 3 Outcome placeholder fixed, this progress item created. progress/ tracker check passes. PR 1 and PR 2 will each get their own branch/PR once this one merges.
 - PR 1 implemented: pipeline.ts tracks best-scoring iteration (fewest errors, then warnings, then earliest on a tie) and ships it as final.mp4/doc.final.json instead of always the last render; per-iteration doc.json snapshots added to rundir.ts; IterationSummary carries critique issues, inlined into eval.ts's report.md. Tests: 3 new/updated pipeline.test.ts cases covering tie-break-to-earlier, regression-then-recovery (1->2->1), and strict-improvement (2->1) scenarios, plus rundir.test.ts field coverage. docs/agent-pipeline.md run-dir contract + critique-loop section updated, Last-updated bumped. pnpm verify green (196 tests, keyless).
+- PR 1 opened: https://github.com/FWcloud916/motife/pull/13 (branch phase-4/keep-best-iteration).
 
 ## Outcome
 
