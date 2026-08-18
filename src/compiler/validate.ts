@@ -10,6 +10,15 @@
 // src/compiler/errors.ts's file header for why that discipline matters
 // (these strings are Phase 3's retry feedback).
 import type { DslDocument, DslNode, DslScene, Track, WindowRef } from "../dsl";
+import {
+  DETAIL_FONT_SIZE,
+  LABEL_FONT_SIZE,
+  MAX_NODE_CONTENT_WIDTH,
+  computeLayout,
+  computeSafeArea,
+  estimateGraphNodeSizes,
+  estimateTextWidth,
+} from "../components";
 import type { DslIssue, DslIssueCode } from "./errors";
 import { quoteList } from "./path";
 import {
@@ -39,6 +48,32 @@ const COMFORTABLE_CHARS_PER_SEC = 8;
 const TOO_FAST_MULTIPLIER = 1.5;
 const TOO_SLOW_MULTIPLIER = 0.3;
 
+// A node's estimated label/detail content width (see
+// estimateNodeSizes.ts) past which the card wraps instead of widening —
+// crossing it is a warning, not a hard failure, since a wrapped label can
+// still render fully depending on how many lines fit.
+const LABEL_WRAP_WIDTH = MAX_NODE_CONTENT_WIDTH; // 496
+// Past this, nodeSizing.ts's own height-budget comment ("icon 82 + gap 16
+// + two wrapped label lines ~2x33 + gap 16 + a detail line 25 ≈ 205 of a
+// 228 budget") means a THIRD wrapped line has nowhere left to go —
+// DiagramNode's overflow:hidden guarantees it's cut off. This is the one
+// layout-budget lint that's an error: unlike the warnings below, there is
+// no scenario where crossing it renders correctly.
+const CLIP_CONTENT_WIDTH = 2 * MAX_NODE_CONTENT_WIDTH; // 992
+// Every checked-in baseline diagram has at most 7 nodes; flagging past 8
+// still leaves headroom for legitimate small graphs while catching the
+// LLM's tendency to over-enumerate.
+const MAX_DIAGRAM_NODES = 8;
+
+/** The pixel box a scene's `content` actually has, per safeArea.ts —
+ * threaded down from validateScene() to the two checks that need to know
+ * whether something fits the ACTUAL box, not just its own topology
+ * (camera_content_too_tall today). */
+interface SceneLayoutBudget {
+  contentWidth: number;
+  contentHeight: number;
+}
+
 function issue(
   path: string,
   code: DslIssueCode,
@@ -57,7 +92,7 @@ export function validateDocument(doc: DslDocument): DslIssue[] {
   issues.push(...checkTransitions(doc));
 
   doc.scenes.forEach((scene, sceneIndex) => {
-    issues.push(...validateScene(scene, sceneIndex));
+    issues.push(...validateScene(scene, sceneIndex, doc));
   });
 
   return issues;
@@ -219,7 +254,7 @@ function checkNarrationPacing(scene: DslScene, sceneIndex: number): DslIssue[] {
   return [];
 }
 
-function validateScene(scene: DslScene, sceneIndex: number): DslIssue[] {
+function validateScene(scene: DslScene, sceneIndex: number, doc: DslDocument): DslIssue[] {
   const issues: DslIssue[] = [];
   const scenePath = `scenes[${sceneIndex}]`;
 
@@ -229,8 +264,19 @@ function validateScene(scene: DslScene, sceneIndex: number): DslIssue[] {
   const { trackIssues, trackMap } = validateTracks(scene, sceneIndex, usedTracks);
   issues.push(...trackIssues);
 
+  // hasCaption mirrors DslSceneView.tsx's caption-presence rule exactly: an
+  // omitted caption falls back to the scene's narration (still shown, still
+  // reserves CAPTION_CLEARANCE) — only an explicit `caption: null` opts out.
+  const safeArea = computeSafeArea({
+    width: doc.width,
+    height: doc.height,
+    hasHeader: !!scene.header,
+    hasCaption: scene.caption !== null,
+  });
+  const budget: SceneLayoutBudget = { contentWidth: safeArea.width, contentHeight: safeArea.height };
+
   issues.push(
-    ...walkNode(scene.content, `${scenePath}.content`, trackMap, usedTracks),
+    ...walkNode(scene.content, `${scenePath}.content`, trackMap, usedTracks, budget),
   );
 
   (scene.tracks ?? []).forEach((track, trackIndex) => {
@@ -391,12 +437,13 @@ function walkNode(
   path: string,
   trackMap: Map<string, Track>,
   usedTracks: Set<string>,
+  budget: SceneLayoutBudget,
 ): DslIssue[] {
   const issues: DslIssue[] = [];
   const checkWindow = (ref: WindowRef | undefined, subPath: string) =>
     ref ? issues.push(...checkWindowRef(ref, subPath, trackMap, usedTracks)) : undefined;
   const recurse = (child: DslNode, subPath: string) =>
-    issues.push(...walkNode(child, subPath, trackMap, usedTracks));
+    issues.push(...walkNode(child, subPath, trackMap, usedTracks, budget));
 
   switch (node.type) {
     case "stack":
@@ -438,7 +485,7 @@ function walkNode(
       break;
 
     case "camera":
-      issues.push(...validateCamera(node, path, trackMap, usedTracks));
+      issues.push(...validateCamera(node, path, trackMap, usedTracks, budget));
       break;
 
     case "cameraTarget":
@@ -465,7 +512,7 @@ function walkNode(
       break;
 
     case "switch":
-      issues.push(...validateSwitch(node, path, trackMap, usedTracks));
+      issues.push(...validateSwitch(node, path, trackMap, usedTracks, budget));
       break;
   }
 
@@ -496,7 +543,50 @@ function validateDiagram(
       );
     }
     nodeIds.add(graphNode.id);
+
+    // Estimated (no DOM here — see estimateNodeSizes.ts), and deliberately
+    // conservative-high: this can warn about a label that would actually
+    // fit, never miss one that won't. Label and detail are checked
+    // independently against the wider one, since either alone can overflow
+    // the card regardless of the other.
+    const labelWidth = estimateTextWidth(graphNode.label, LABEL_FONT_SIZE);
+    const detailWidth = graphNode.detail ? estimateTextWidth(graphNode.detail, DETAIL_FONT_SIZE) : 0;
+    const wider = detailWidth > labelWidth ? "detail" : "label";
+    const contentWidth = Math.max(labelWidth, detailWidth);
+    if (contentWidth > CLIP_CONTENT_WIDTH) {
+      issues.push(
+        issue(
+          `${path}.graph.nodes[${i}].${wider}`,
+          "diagram_label_clipped",
+          "error",
+          `Node "${graphNode.id}"'s ${wider} is estimated at ~${Math.round(contentWidth)}px wide — past the point where the card's text wraps to 3+ lines and the extra lines get cut off (the card doesn't grow taller to fit).`,
+          `shorten this to roughly 18 full-width (CJK) or 30 half-width characters, move the explanation into the scene's narration instead, or split this node into two.`,
+        ),
+      );
+    } else if (contentWidth > LABEL_WRAP_WIDTH) {
+      issues.push(
+        issue(
+          `${path}.graph.nodes[${i}].${wider}`,
+          "diagram_label_too_long",
+          "warning",
+          `Node "${graphNode.id}"'s ${wider} is estimated at ~${Math.round(contentWidth)}px wide — it will wrap onto multiple lines when rendered.`,
+          `shorten this to roughly 18 full-width (CJK) or 30 half-width characters, or move detail into the scene's narration instead.`,
+        ),
+      );
+    }
   });
+
+  if (node.graph.nodes.length > MAX_DIAGRAM_NODES) {
+    issues.push(
+      issue(
+        `${path}.graph.nodes`,
+        "diagram_too_many_nodes",
+        "warning",
+        `This diagram has ${node.graph.nodes.length} nodes — more than any diagram in the reference examples (max ${MAX_DIAGRAM_NODES}) comfortably fits a scene.`,
+        `split the graph across two scenes (or two side-by-side diagrams), or prune to only the nodes the narration actually references.`,
+      ),
+    );
+  }
 
   const edgeIds = new Set<string>();
   node.graph.edges.forEach((edge, i) => {
@@ -630,6 +720,7 @@ function validateCamera(
   path: string,
   trackMap: Map<string, Track>,
   usedTracks: Set<string>,
+  budget: SceneLayoutBudget,
 ): DslIssue[] {
   const issues: DslIssue[] = [];
   const checkWindow = (ref: WindowRef | undefined, subPath: string) =>
@@ -637,6 +728,15 @@ function validateCamera(
 
   const nodeIds = new Map<string, string>(); // id -> first-seen path
   const targetIds = new Map<string, string>();
+  // A camera nested inside a Camera renders at native scale with no fit
+  // transform of its own (Diagram.tsx) — its rendered footprint is exactly
+  // computeLayout()'s bounding box, so this can be checked directly against
+  // the scene's real content box, unlike the estimation-sensitive width
+  // checks above.
+  const nestedDiagrams: Array<{
+    graph: Extract<DslNode, { type: "diagram" }>["graph"];
+    childPath: string;
+  }> = [];
 
   const collect = (child: DslNode, childPath: string) => {
     if (child.type === "camera") return; // independent registry
@@ -644,6 +744,7 @@ function validateCamera(
       for (const graphNode of child.graph.nodes) {
         if (!nodeIds.has(graphNode.id)) nodeIds.set(graphNode.id, childPath);
       }
+      nestedDiagrams.push({ graph: child.graph, childPath });
     }
     if (child.type === "cameraTarget") {
       if (targetIds.has(child.id)) {
@@ -708,7 +809,24 @@ function validateCamera(
     }
   });
 
-  node.children.forEach((child, i) => issues.push(...walkNode(child, `${path}.children[${i}]`, trackMap, usedTracks)));
+  for (const { graph, childPath } of nestedDiagrams) {
+    const layout = computeLayout(graph, estimateGraphNodeSizes(graph));
+    if (layout.height > budget.contentHeight) {
+      issues.push(
+        issue(
+          `${childPath}.graph`,
+          "camera_content_too_tall",
+          "warning",
+          `This diagram is estimated at ~${Math.round(layout.height)}px tall, taller than the ~${Math.round(budget.contentHeight)}px this scene's content area has even with nothing else in it — an establishing shot (focus: "all") has to shrink it well below a legible size to fit.`,
+          `use graph.direction "right" instead of "down" to spread ranks horizontally, reduce the number of ranks (chain depth), split the walkthrough across more scenes, or avoid stacking other content above/below the camera in this scene.`,
+        ),
+      );
+    }
+  }
+
+  node.children.forEach((child, i) =>
+    issues.push(...walkNode(child, `${path}.children[${i}]`, trackMap, usedTracks, budget)),
+  );
 
   return issues;
 }
@@ -736,6 +854,7 @@ function validateSwitch(
   path: string,
   trackMap: Map<string, Track>,
   usedTracks: Set<string>,
+  budget: SceneLayoutBudget,
 ): DslIssue[] {
   const issues: DslIssue[] = [];
 
@@ -786,7 +905,9 @@ function validateSwitch(
       ranges.push({ lo, hi, caseIndex });
     }
 
-    issues.push(...walkNode(caseEntry.content, `${path}.cases[${caseIndex}].content`, trackMap, usedTracks));
+    issues.push(
+      ...walkNode(caseEntry.content, `${path}.cases[${caseIndex}].content`, trackMap, usedTracks, budget),
+    );
   });
 
   const sorted = ranges.slice().sort((a, b) => a.lo - b.lo);

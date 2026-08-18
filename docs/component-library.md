@@ -85,6 +85,19 @@ Provides `SceneContext = { durationInFrames, fps }` to every descendant via
 `useSceneTiming()` — this is what lets `Window`-based components resolve
 their timing without their own duration prop.
 
+Also provides `SafeAreaContext = { width, height } | null` (`Scene/safeArea.ts`,
+`computeSafeArea()`) — the real pixel box `content` has after the
+header/caption clearances above are subtracted. Phase 4 introduced this so
+a component that needs a hard cap (standalone `Diagram`'s `fit`, see below)
+can get one without DOM measurement: it's pure arithmetic from
+`useVideoConfig()`'s width/height plus whether `header`/`caption` are set,
+computed once by `Scene` and read via `useContext`. Exported from the
+barrel (`HEADER_CLEARANCE`, `CAPTION_CLEARANCE`, `CONTENT_EDGE_PAD`,
+`computeSafeArea`, `SafeAreaContext`) specifically so
+`src/compiler/validate.ts` computes the identical box for its
+`camera_content_too_tall` lint (see `Camera` below) — one set of numbers,
+not two copies that can drift.
+
 ## `Stack` — the only layout primitive
 
 ```ts
@@ -341,6 +354,22 @@ the DSL a Phase 2 compiler emits keeps describing topology and never
 geometry. The pure half of the calculation (`layout/nodeSizing.ts`) is
 unit-tested; the DOM half (`layout/measureNodes.ts`) is browser-only.
 
+**Standalone real-pixel cap (Phase 4):** `fit`'s SVG sizing is otherwise
+unbounded — a `fit:"width"` diagram's `aspect-ratio`-derived height (or a
+`fit:"contain"` diagram inside a flex box that's overflowed its own
+ancestor) can grow past the enclosing `<Scene>`'s actual content area,
+which is exactly Phase 3's "Diagram 節點卡片過大遭畫面裁切" failure mode.
+Standalone `Diagram` (this section only — nested-in-Camera below is
+unaffected) reads `SafeAreaContext` (see `Scene` above) and applies
+`maxHeight: safeArea?.height` (plus `maxWidth: "100%"`) to the SVG. Since
+`aspect-ratio`/`height:100%` are only *preferred* sizes, `max-height` wins
+once it would be exceeded, and the existing `viewBox` +
+`preserveAspectRatio="xMidYMid meet"` then letterboxes (shrinks and
+centers) instead of clipping. `null` outside a `<Scene>` — the cap simply
+doesn't apply, same as before this existed. On all three checked-in
+baseline documents this never binds (their rendered heights sit well
+inside the safe area) — verified pixel-identical smoke renders.
+
 **Nesting inside `<Camera>`:** a `Diagram` rendered as a `Camera`'s
 descendant hands framing over entirely — it registers its node rects (and
 overall bounds, for `focus: "all"`) into the Camera's registry and renders
@@ -486,9 +515,14 @@ against that measured viewport:
 One composition caveat survives the measured viewport: a Camera squeezed
 into a very small box now shows everything, *scaled to fit* — a `wide`
 shot of a tall diagram inside a cramped Stack renders complete but tiny.
-Legibility of that layout choice is the DSL author's (or a future
-`validate.ts` density lint's) problem; Camera's contract is only that
-framing never clips or pans off the content.
+Legibility of that layout choice is the DSL author's problem, not
+Camera's — its contract is only that framing never clips or pans off the
+content. `src/compiler/validate.ts`'s `camera_content_too_tall` warning
+(docs/dsl-schema.md) is the density-lint half: it estimates a nested
+diagram's own layout height against the enclosing scene's real content
+area (`computeSafeArea`, same numbers this section's measured viewport
+converges toward) and flags it before render, independent of whatever
+else happens to share the Stack.
 
 `<CameraTarget id>` registers a non-Diagram child's box as a focusable
 target by id (fallback path for content a nested `Diagram` doesn't already
@@ -580,11 +614,24 @@ catches a defect both current candidates share.
   `camera` shares its Stack with a "steps" card, shrinking Camera's actual
   box to ~1728×541 against the assumed 1920×1080. Fixed at the component
   layer — Camera now measures its real box (see `Camera` above) — so a
-  cramped Camera renders complete-but-small instead of clipped. What
-  remains is a *legibility* question, not a correctness one: a
-  `validate.ts` density lint (warn when a `camera` shares a Stack with
-  tall siblings) is still worth considering alongside the planned Diagram
-  footprint lint; see `progress/2026-08-17-phase-4-polish-and-publish/`.
+  cramped Camera renders complete-but-small instead of clipped. The
+  remaining *legibility* question (not correctness) is covered by the
+  `camera_content_too_tall` validate.ts lint below — it fires on the
+  db-index baseline by design (the diagram it warns about is exactly the
+  one that produced this failure mode); see
+  `progress/2026-08-17-phase-4-polish-and-publish/`.
+- **Diagram overflow (Phase 3's "節點卡片過大遭畫面裁切") — RESOLVED in
+  Phase 4.** Two layers: standalone `Diagram` now caps its rendered height
+  to `SafeAreaContext` (see `Diagram` above — a component-layer guarantee,
+  never clips regardless of what the DSL asks for), and `validate.ts` adds
+  three estimated-text lints (`diagram_label_too_long` warning,
+  `diagram_label_clipped` error, `diagram_too_many_nodes` warning) plus the
+  camera one above — pushing the signal into the channel an LLM can act on
+  (the clip lint is error-severity specifically so it re-enters the
+  generate retry loop; the rest ride the dsl-schema.md thresholds embedded
+  in the system prompt, same posture as `narration_pacing`). See
+  docs/dsl-schema.md's "Validation issue codes" table and "Layout budgets"
+  note under `Diagram`.
 - No open items carried over from Phase 1 — those (Diagram node measuring,
   CameraTarget measurement, transition overlap math, barrel-import
   enforcement) were all closed before Phase 2 began. The barrel rule is

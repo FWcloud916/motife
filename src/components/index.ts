@@ -11,6 +11,9 @@ export type { IconName } from "./icons/registry";
 export { Scene } from "./Scene/Scene";
 export type { SceneHeaderSpec, SceneProps } from "./Scene/Scene";
 export { useSceneTiming } from "./Scene/SceneContext";
+export { CAPTION_CLEARANCE, CONTENT_EDGE_PAD, HEADER_CLEARANCE, computeSafeArea } from "./Scene/safeArea";
+export type { SafeArea } from "./Scene/safeArea";
+export { SafeAreaContext } from "./Scene/SafeAreaContext";
 
 export { Callout } from "./Callout/Callout";
 export type { CalloutProps } from "./Callout/Callout";
@@ -40,6 +43,13 @@ export type {
   LayoutRect,
   LayoutResult,
 } from "./layout/types";
+export {
+  DETAIL_FONT_SIZE,
+  LABEL_FONT_SIZE,
+  MAX_NODE_CONTENT_WIDTH,
+  estimateGraphNodeSizes,
+  estimateTextWidth,
+} from "./layout/estimateNodeSizes";
 
 export { Diagram } from "./Diagram/Diagram";
 export type { DiagramActiveNode, DiagramProps } from "./Diagram/Diagram";
