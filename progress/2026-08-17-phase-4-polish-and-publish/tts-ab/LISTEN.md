@@ -1,19 +1,19 @@
 # TTS A/B — 評分表
 
-跑完 [README.md](README.md) 的候選矩陣、聽過 `out/tts-ab/<label>/public/audio/*.mp3`
-之後在這裡填分數。1–5 分,仿 `motife eval` 人工評分的格式。
+全部 7 組候選已產生並透過對話傳送 mp3(2026-08-18)。聽完之後在這裡填分數。
+1–5 分,仿 `motife eval` 人工評分的格式。
 
 ## 評分表
 
 | label | 口音自然度 | 中英混讀 | 語速節奏 | 整體 | 備註 |
 |---|---|---|---|---|---|
-| A-baseline |  |  |  |  |  |
-| B-alloy-instr |  |  |  |  |  |
-| C-coral-instr |  |  |  |  |  |
-| D-sage-instr |  |  |  |  |  |
-| E-ash-instr |  |  |  |  |  |
-| F-11-multi |  |  |  |  |  |
-| G-11-alt |  |  |  |  |  |
+| A-baseline(alloy,無引導) |  |  |  |  |  |
+| B-alloy-instr(alloy + 台灣口音引導) |  |  |  |  |  |
+| C-coral-instr(coral + 引導) |  |  |  |  |  |
+| D-sage-instr(sage + 引導) |  |  |  |  |  |
+| E-ash-instr(ash + 引導) |  |  |  |  |  |
+| F-11-xuming(ElevenLabs「Xu Ming」台灣國語) |  |  |  |  |  |
+| G-11-roy(ElevenLabs「Roy - Taiwanese Youth」台灣國語) |  |  |  |  |  |
 
 備註欄使用建議:若候選「聽起來不穩定/過度風格化」,寫這句而非直接判它輸
 (ElevenLabs 的 `voice_settings`/`language_code` 目前沒接,見 README「決策

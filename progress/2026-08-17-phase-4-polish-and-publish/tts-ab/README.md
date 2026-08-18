@@ -8,21 +8,28 @@ voice=`alloy`)的最後一步。PR 4 已經把 `--tts-model`/`--tts-instructions
 選出贏家後,開一個小 PR(4b)把 `src/tts/defaults.ts` 的預設值(以及/或
 `.env` 建議值)改成贏家即可,不需要重跑這份 PR 4 的其他任何東西。
 
-## 先做的事(只需一次)
+**狀態:全部 7 組候選已產生並送出給你聽(2026-08-18)。** 音檔本身在
+gitignore 的 `out/tts-ab/` 底下,已透過對話直接傳送 mp3——下面的執行步驟
+留著給要重跑/换候選的人參考。
 
-1. **複製 API key 到這個 worktree**(`.env` 已被 gitignore,不會混進 PR):
+## 先做的事(只需一次,已完成——記錄留給下次重跑的人)
+
+1. **API key**:用 shell inline source 主 checkout 的 `.env`,不在這個
+   worktree 建立金鑰複本:
    ```bash
-   cp /Users/kdanmobile/Documents/private/motife/.env .env
+   set -a; source /Users/kdanmobile/Documents/private/motife/.env; set +a
    ```
-   或者不複製,直接在指令前面用 inline env var(見下方指令範例)。
-2. **ElevenLabs 需要一個中文 voice id**——目前 `.env` 的 `ELEVENLABS_VOICE_ID`
-   是空的。去 ElevenLabs 帳號的 Voice Library 挑一個支援中文的 voice,或
-   用 API 列出帳號已有的 voice:
+2. **ElevenLabs 中文 voice**——帳號原本沒有任何中文 voice,但 ElevenLabs
+   的**共用語音庫**(不是帳號自己的 voice 列表)可以搜到中文候選:
    ```bash
-   curl -s -H "xi-api-key: $ELEVENLABS_API_KEY" https://api.elevenlabs.io/v1/voices \
-     | python3 -m json.tool | less
+   curl -s -H "xi-api-key: $ELEVENLABS_API_KEY" \
+     "https://api.elevenlabs.io/v1/shared-voices?language=zh&page_size=10" | python3 -m json.tool
    ```
-   拿到 id 後填進下面矩陣的 `<ZH_VOICE_ID>`。
+   搜到兩個標記 `taiwan mandarin` 的 voice,已取得使用者確認後加入帳號
+   語音庫(`POST /v1/voices/add/{public_owner_id}/{voice_id}`,`public_owner_id`
+   來自上面搜尋結果的欄位):
+   - `A3T1GnLHdn0WL5w4TMtq` — "Xu Ming"(男聲,zh taiwan mandarin)
+   - `XXxvxx0YUt8icTEFE3c6` — "Roy - Taiwanese Youth"(男聲,zh taiwan mandarin)
 
 ## 候選矩陣
 
@@ -49,8 +56,8 @@ voice=`alloy`)的最後一步。PR 4 已經把 `--tts-model`/`--tts-instructions
 | `C-coral-instr` | openai | gpt-4o-mini-tts | coral | 同上 |
 | `D-sage-instr` | openai | gpt-4o-mini-tts | sage | 同上 |
 | `E-ash-instr` | openai | gpt-4o-mini-tts | ash | 同上 |
-| `F-11-multi` | elevenlabs | eleven_multilingual_v2 | `<ZH_VOICE_ID>` | n/a |
-| `G-11-alt` | elevenlabs | (帳號較新的 model,若有) | `<ZH_VOICE_ID>` | n/a |
+| `F-11-xuming` | elevenlabs | eleven_multilingual_v2 | `A3T1GnLHdn0WL5w4TMtq`(Xu Ming) | n/a |
+| `G-11-roy` | elevenlabs | eleven_multilingual_v2 | `XXxvxx0YUt8icTEFE3c6`(Roy) | n/a |
 
 `A` vs `B` 單獨測 instructions 有沒有用;`B`–`E` 在固定 instructions 下比較
 voice;`F`/`G` 是跨廠牌對照組。
@@ -69,9 +76,10 @@ pnpm motife tts "$FIXTURE" --run out/tts-ab/B-alloy-instr \
 pnpm motife tts "$FIXTURE" --run out/tts-ab/A-baseline \
   --tts openai --voice alloy --tts-model gpt-4o-mini-tts
 
-# ElevenLabs 候選
-pnpm motife tts "$FIXTURE" --run out/tts-ab/F-11-multi \
-  --tts elevenlabs --voice <ZH_VOICE_ID> --tts-model eleven_multilingual_v2
+# ElevenLabs 候選(voice id 見上方矩陣;第一次使用前該 voice 必須已在帳號
+# 語音庫,見上方「先做的事」)
+pnpm motife tts "$FIXTURE" --run out/tts-ab/F-11-xuming \
+  --tts elevenlabs --voice A3T1GnLHdn0WL5w4TMtq --tts-model eleven_multilingual_v2
 ```
 
 每組跑完會在 `out/tts-ab/<label>/public/audio/{control,loanword,codeswitch,summary}.mp3`
