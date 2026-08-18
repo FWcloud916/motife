@@ -1,11 +1,11 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** in-progress
+**Status:** review
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
-**Updated:** 2026-08-17
+**Updated:** 2026-08-18
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | TBD | N/A |  |
+| `motife` | `phase-4/tts-model-wiring` | N/A |  |
 
 ## Background & goals
 
@@ -143,6 +143,37 @@ density lint (warn when a `camera` shares a Stack with tall siblings)
 remains worth adding alongside the planned Diagram footprint lint, now as
 quality hardening rather than the primary fix.
 
+### PR 4 finding: I cannot listen to audio, so PR 4 ships infra + a harness, not a chosen winner
+
+Unlike PR 2/PR 3 (both of which I could fully verify myself — DOM inspection,
+re-rendered stills, `motife validate` output), judging TTS accent
+naturalness is an irreducibly human perceptual task with no tool available
+to me in this session. So PR 4's scope is deliberately split:
+
+- **What's fully done and verified:** `--tts-model`/`--tts-instructions`
+  reach the API (proven by `openai.test.ts`/`elevenlabs.test.ts` asserting
+  the actual request body via a typed `fetch` mock, not just that the code
+  compiles); `narrationHash` now includes model+instructions and switching
+  either correctly invalidates the cache (`synthesize.test.ts`); a second,
+  previously-unreported bug fixed alongside it — the old newline-joined hash
+  could collide across the instructions/narration field boundary once
+  instructions became free multi-line text (`manifest.test.ts`'s injection
+  test guards this permanently). `pnpm verify` green (282 tests, keyless).
+- **What's deliberately NOT done:** picking a new default voice/model.
+  `src/tts/defaults.ts` still ships `alloy`/`gpt-4o-mini-tts` — the exact
+  Phase 3 configuration that scored 3/5 on 旁白. Changing it without
+  listening would just be guessing.
+- **The handoff:** `progress/2026-08-17-phase-4-polish-and-publish/tts-ab/`
+  — a fixture doc (4 scenes, narration copied verbatim from the 3 baselines:
+  clean-Mandarin control, loanword-dense, worst-case code-switching, closing
+  cadence), a 7-candidate matrix (OpenAI × 4 voices × with/without zh-TW
+  accent-steering instructions, plus 2 ElevenLabs candidates) driven through
+  the real `pnpm motife tts` CLI, and a `LISTEN.md` scoring sheet. Listen,
+  pick a winner, and PR 4b is a small, mechanical edit to `defaults.ts` (+ a
+  policy call on whether zh-TW instructions become an opt-in `.env`
+  recommendation — flagged in the harness README, since a hardcoded
+  zh-TW default would be wrong for `--lang en`).
+
 ### Proposed Phase 4 acceptance criterion
 
 motife-plan.md §3 Phase 4 has no 驗收 line today (a gap vs. Phases 0-3).
@@ -167,7 +198,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | done ([#13](https://github.com/FWcloud916/motife/pull/13)) |
 | 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | done ([#14](https://github.com/FWcloud916/motife/pull/14)) |
 | 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram (component-layer guarantee) + 4 `validate.ts` lints: `diagram_label_too_long`/`diagram_label_clipped`(error)/`diagram_too_many_nodes` (estimated text/node-count budgets) + `camera_content_too_tall` (the density-lint hardening — height-only, estimation-immune) | **Yes** | done ([#15](https://github.com/FWcloud916/motife/pull/15)) |
-| 4 | TTS model wiring + A/B | `--tts-model`/`MOTIFE_TTS_MODEL` + narration-hash includes model; OpenAI voices/instructions **and** ElevenLabs zh voice both evaluated | Audio re-synthesis only | not started |
+| 4 | TTS model wiring + A/B | `--tts-model`/`--tts-instructions`/`MOTIFE_TTS_*` wired; narration-hash includes model+instructions; ready-to-run A/B harness (`tts-ab/`) for OpenAI voices/instructions **and** ElevenLabs — defaults left unchanged pending human listening (see finding below) | Audio re-synthesis only (gitignored `out/` only; zero baseline audio exists) | review (PR opening) |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
 | 7 | `@remotion/player` preview page | `npx remotion add @remotion/player` (pinned, never `pnpm add`); `node:http` server using the run-dir as state; new `web/` workspace (Vite); preview available at "audio-ready" (post-TTS, pre-final-render), honoring the TTS-driven-timeline rule | No | not started |
@@ -198,6 +229,16 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 3 — `docs/dsl-schema.md` Diagram "Layout budgets" note + Camera note corrected (was still describing pre-PR-2 behavior) + validation table +4 rows ("All 24 codes") + Last-updated; `docs/component-library.md` Scene/Diagram/Camera sections + "Open items" entries updated to RESOLVED
 - [x] PR 3 — Full verification: `pnpm verify` green (245 tests + smoke + audio smoke); re-rendered baseline stills pixel-identical to pre-PR (cap never binds, verified by eye); `pnpm motife validate` on all 3 baselines — jwt/mq clean, db-index emits exactly the intended `camera_content_too_tall` warning (~1200px vs ~720px, exit 0); synthetic oversized doc demonstrates all 4 new lints firing with actionable non-pixel fix text
 - [x] PR 3 — Open PR
+- [x] PR 4 — `TtsProvider` gains `model`/`instructions` (both narration-hash inputs); `createOpenAiTts`/`createElevenLabsTts` thread `model` (already accepted, never wired) + OpenAI gets a net-new conditional `instructions` field
+- [x] PR 4 — New `src/tts/defaults.ts` (`DEFAULT_TTS_MODELS`, `DEFAULT_OPENAI_TTS_VOICE`) — dependency-free leaf module, same discipline as `providers.ts`'s `DEFAULT_MODELS`
+- [x] PR 4 — `resolveTtsModel`/`resolveTtsVoice`/`resolveTtsInstructions` (flag > env > default, mirroring `providers.ts`); `MOTIFE_TTS_MODEL`/`MOTIFE_TTS_VOICE`/`MOTIFE_TTS_INSTRUCTIONS`; ElevenLabs + instructions throws a named error
+- [x] PR 4 — `narrationHash` → object param + JSON-tuple encoding (fixes the reported model-not-hashed bug AND a newline-collision bug found while implementing)
+- [x] PR 4 — `--tts-model`/`--tts-instructions` wired into `run.ts`/`tts.ts`/`eval.ts`; `eval.ts`'s TTS provider hoisted out of the per-concept loop; `renderEvalReport` gains a self-describing TTS config line
+- [x] PR 4 — 5 new test files (`defaults` via table-completeness, `manifest.test.ts` incl. pinned-hash canary + injection regression, `provider.test.ts` all 4 resolvers + precedence, `openai.test.ts`/`elevenlabs.test.ts` asserting actual request bodies via typed `fetch` mocks) — all keyless
+- [x] PR 4 — Docs: `docs/agent-pipeline.md` (CLI table, provider-selection paragraph, hash description, env table, TTS-defaults-location correction, implementation map), `.env.example` (3 new keys + precedence comment), `.claude/skills/motife-generate/SKILL.md`; Last-updated bumped
+- [x] PR 4 — A/B harness (`tts-ab/{fixture.doc.json,README.md,LISTEN.md}`) — defaults left unchanged; see finding above
+- [x] PR 4 — Full verification: `pnpm verify` green (282 tests), `motife {run,tts,eval} --help` show the new flags, fixture doc validates clean
+- [x] PR 4 — Open PR
 
 ## Work log
 
@@ -216,6 +257,10 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 3 implemented: safeArea.ts + SafeAreaContext (Scene provides the real content box, no behavior change to existing padding); estimateNodeSizes.ts (pure CJK-aware text-width estimator mirroring measureNodes.ts); Diagram.tsx standalone fit now caps at the safe area (letterbox, never clip; camera-nested untouched); validate.ts gains 4 layout-budget lints threaded via a new SceneLayoutBudget param (diagram_label_too_long/clipped/too_many_nodes on validateDiagram, camera_content_too_tall on validateCamera's existing subtree collection). Calibrated thresholds against real dagre runs + hand-measurement of all 3 baseline docs before writing any code (shrink-factor thresholds were ruled out -- baseline content legitimately sits at 0.34-0.47x; text-width/node-count/camera-height were the clean separators). pnpm verify green (245 tests); baseline smoke stills re-rendered pixel-identical (cap never binds anywhere, as calibrated); pnpm motife validate confirms jwt/mq clean and db-index emits exactly the intended camera_content_too_tall warning; a synthetic oversized doc demonstrated all 4 new lints firing with actionable fix text. docs/dsl-schema.md and docs/component-library.md updated, including fixing a stale pre-PR-2 Camera description in dsl-schema.md noticed along the way.
 - PR 3 opened: https://github.com/FWcloud916/motife/pull/15 (branch phase-4/diagram-overflow-bounding). Independently re-verified before merge (fresh session, no reliance on prior notes): re-ran pnpm verify (245 tests + smoke + audio smoke, all green), ran `motife validate` by hand on all 3 baselines (jwt/mq exit 0 clean, db-index exit 0 with exactly the intended camera_content_too_tall warning), and read every diff hunk end to end (errors.ts, validate.ts, Diagram.tsx, estimateNodeSizes.ts, safeArea.ts, parse.test.ts, both docs, barrel exports) -- matches the PR description precisely, no discrepancies found.
 - PR 3 merged: https://github.com/FWcloud916/motife/pull/15 (merge commit 7fbf2b9). Failure modes 1 (Diagram overflow) and 2 (Camera framing) are now both fully fixed; only failure mode 3 (TTS accent, PR 4) remains from the original Phase 3 queue. Next up: PR 4 (TTS model wiring + OpenAI/ElevenLabs A/B) in a future session.
+
+### 2026-08-18
+
+- PR 4 implemented: TtsProvider gains model + instructions (both narration-hash inputs); createOpenAiTts/createElevenLabsTts thread model (already accepted, never wired) and OpenAI gets a net-new conditional instructions field (omitted entirely for models that reject it, e.g. tts-1). New src/tts/defaults.ts centralizes DEFAULT_TTS_MODELS/DEFAULT_OPENAI_TTS_VOICE as a dependency-free leaf module. New resolveTtsModel/resolveTtsVoice/resolveTtsInstructions mirror providers.ts's flag>env>default pattern (MOTIFE_TTS_MODEL/MOTIFE_TTS_VOICE/MOTIFE_TTS_INSTRUCTIONS); ElevenLabs + instructions throws a named error instead of silently dropping it. narrationHash changed from positional args + newline-joining to an object param + JSON-tuple encoding -- fixes both the reported bug (model wasn't hashed, so switching models silently reused cached audio) and a latent one found while implementing (newline-joined instructions/narration could collide across the field boundary). --tts-model/--tts-instructions wired into run.ts/tts.ts/eval.ts; eval.ts's TTS provider hoisted out of the per-concept loop (stateless, fails fast, lets the report record it) and renderEvalReport now has a TTS config line -- an eval report is now self-describing the same way PR 1 made critique issues self-describing. 5 new test files (defaults covered via provider.test.ts's table-completeness case; manifest.test.ts has a pinned-hash canary + injection-collision regression test; provider.test.ts covers all 4 resolvers + precedence; openai.test.ts/elevenlabs.test.ts assert actual request bodies via a typed fetch mock, proving the flags really reach the wire) -- all keyless (vi.stubEnv + stubbed fetch, no network). pnpm verify green (282 tests). Defaults left UNCHANGED (alloy/gpt-4o-mini-tts) on purpose -- I have no audio-listening capability, so I cannot judge accent naturalness myself. Shipped a ready-to-run A/B harness instead (progress/2026-08-17-phase-4-polish-and-publish/tts-ab/: fixture.doc.json with 4 scenes' narration copied verbatim from the 3 baselines -- clean-Mandarin control, loanword-dense, worst-case code-switching, closing cadence -- a 7-candidate matrix in README.md using the real motife tts CLI, and a LISTEN.md scoring sheet). User listens, picks a winner, and a small PR 4b edits src/tts/defaults.ts (and decides whether zh-TW instructions become an opt-in .env recommendation or stay purely manual -- flagged as a real policy question, not a one-line change, since a hardcoded zh instruction default would be wrong for --lang en).
 
 ## Outcome
 

@@ -46,6 +46,8 @@ const DOC = parseDocumentOrThrow({
 class CountingTts implements TtsProvider {
   readonly name = "openai" as const;
   readonly voice: string = "test-voice";
+  readonly model: string = "test-model";
+  readonly instructions: string | undefined = undefined;
   calls: string[] = [];
 
   async synthesize(text: string): Promise<{ audio: Uint8Array; format: "mp3" }> {
@@ -134,6 +136,30 @@ describe("synthesizeDoc", () => {
       override readonly voice = "other-voice";
     }
     const provider = new OtherVoice();
+    const result = await synthesizeDoc(options(provider));
+    expect(provider.calls).toHaveLength(4);
+    expect(result.reused).toEqual([]);
+  });
+
+  it("re-synthesizes everything when the model changes (the bug this hash exists to prevent)", async () => {
+    await synthesizeDoc(options(new CountingTts()));
+
+    class OtherModel extends CountingTts {
+      override readonly model = "other-model";
+    }
+    const provider = new OtherModel();
+    const result = await synthesizeDoc(options(provider));
+    expect(provider.calls).toHaveLength(4);
+    expect(result.reused).toEqual([]);
+  });
+
+  it("re-synthesizes everything when instructions change", async () => {
+    await synthesizeDoc(options(new CountingTts()));
+
+    class WithInstructions extends CountingTts {
+      override readonly instructions = "speak slowly";
+    }
+    const provider = new WithInstructions();
     const result = await synthesizeDoc(options(provider));
     expect(provider.calls).toHaveLength(4);
     expect(result.reused).toEqual([]);

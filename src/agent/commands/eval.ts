@@ -29,6 +29,8 @@ options:
   --provider / --model                generation LLM (as in \`motife run\`)
   --lang <bcp47>                      narration language (default zh-TW)
   --tts <name> / --voice <id>         TTS provider (default openai)
+  --tts-model <id> / --tts-instructions <text>
+                                       TTS model + OpenAI accent steering
   --no-audio                          skip TTS
   --critique-provider / --critique-model
   --max-revisions <n>                 default 2
@@ -44,7 +46,9 @@ export async function run(argv: string[]): Promise<number> {
         model: { type: "string" },
         lang: { type: "string" },
         tts: { type: "string" },
+        "tts-model": { type: "string" },
         voice: { type: "string" },
+        "tts-instructions": { type: "string" },
         "no-audio": { type: "boolean" },
         "critique-provider": { type: "string" },
         "critique-model": { type: "string" },
@@ -89,6 +93,21 @@ export async function run(argv: string[]): Promise<number> {
   const critiqueProvider = resolveCritiqueProvider(args.values["critique-provider"]);
   const critiqueModel = resolveCritiqueModel(critiqueProvider, args.values["critique-model"]);
 
+  // Constructed once, up front — the provider is a stateless closure over
+  // apiKey/voice/model, identical for every concept, so this doesn't
+  // change behavior; it fails fast before any LLM spend, and it gives
+  // renderEvalReport the config to record (an eval report that doesn't say
+  // which voice produced it isn't archivable — the same gap PR 1 closed
+  // for critique issues).
+  const ttsProvider: TtsProvider | null = args.values["no-audio"]
+    ? null
+    : createTtsProvider({
+        flag: args.values.tts,
+        voice: args.values.voice,
+        model: args.values["tts-model"],
+        instructions: args.values["tts-instructions"],
+      });
+
   const date = new Date().toISOString().slice(0, 10);
   const evalRoot = path.join("out", "eval", date);
   await mkdir(evalRoot, { recursive: true });
@@ -103,10 +122,6 @@ export async function run(argv: string[]): Promise<number> {
 
   for (const concept of concepts) {
     console.log(`\n=== eval: ${concept.slug} — ${concept.title} ===`);
-    // A fresh TTS provider per concept keeps voice/env resolution simple.
-    const ttsProvider: TtsProvider | null = args.values["no-audio"]
-      ? null
-      : createTtsProvider({ flag: args.values.tts, voice: args.values.voice });
 
     const started = Date.now();
     try {
@@ -141,7 +156,7 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const reportPath = path.join(evalRoot, "report.md");
-  await writeFile(reportPath, renderEvalReport(date, provider, model, results), "utf8");
+  await writeFile(reportPath, renderEvalReport(date, provider, model, ttsProvider, results), "utf8");
   console.log(`\neval: report -> ${reportPath}`);
 
   const failed = results.filter((entry) => entry.error !== null);
@@ -157,6 +172,7 @@ function renderEvalReport(
   date: string,
   provider: string,
   model: string,
+  ttsProvider: TtsProvider | null,
   results: Array<{
     slug: string;
     title: string;
@@ -165,10 +181,15 @@ function renderEvalReport(
     elapsedSeconds: number;
   }>,
 ): string {
+  const ttsLine = ttsProvider
+    ? `TTS: ${ttsProvider.name} (voice ${ttsProvider.voice}, model ${ttsProvider.model})` +
+      (ttsProvider.instructions ? `; instructions: "${ttsProvider.instructions}"` : "")
+    : "TTS: disabled (--no-audio)";
   const lines = [
     `# motife eval — ${date}`,
     "",
     `Generation: ${provider} (${model}). Full pipeline, no manual intervention.`,
+    ttsLine,
     "",
   ];
 
