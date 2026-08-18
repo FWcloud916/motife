@@ -1,7 +1,7 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** review
+**Status:** in-progress
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-4/diagram-overflow-bounding` | N/A |  |
+| `motife` | TBD | N/A |  |
 
 ## Background & goals
 
@@ -166,7 +166,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | 0 | progress 追蹤 | This progress item; motife-plan.md Phase 4 acceptance criterion added | No | done ([#12](https://github.com/FWcloud916/motife/pull/12)) |
 | 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | done ([#13](https://github.com/FWcloud916/motife/pull/13)) |
 | 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | done ([#14](https://github.com/FWcloud916/motife/pull/14)) |
-| 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram (component-layer guarantee) + 4 `validate.ts` lints: `diagram_label_too_long`/`diagram_label_clipped`(error)/`diagram_too_many_nodes` (estimated text/node-count budgets) + `camera_content_too_tall` (the density-lint hardening — height-only, estimation-immune) | **Yes** | review ([#15](https://github.com/FWcloud916/motife/pull/15)) |
+| 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram (component-layer guarantee) + 4 `validate.ts` lints: `diagram_label_too_long`/`diagram_label_clipped`(error)/`diagram_too_many_nodes` (estimated text/node-count budgets) + `camera_content_too_tall` (the density-lint hardening — height-only, estimation-immune) | **Yes** | done ([#15](https://github.com/FWcloud916/motife/pull/15)) |
 | 4 | TTS model wiring + A/B | `--tts-model`/`MOTIFE_TTS_MODEL` + narration-hash includes model; OpenAI voices/instructions **and** ElevenLabs zh voice both evaluated | Audio re-synthesis only | not started |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
@@ -214,7 +214,8 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 2 follow-up (user review: the PR should actually fix the camera problem, not just the math half): Camera now measures its real wrapper box via the proven CameraTarget pattern (fontsReady gate + eager delayRender handle + per-commit re-measure with dedupe) and runs both clamps against the measured viewport; useVideoConfig() remains only as the never-screenshotted pre-measurement fallback. Re-rendered db-index stills: wide shot now shows the complete tree (was: leaf/table rows clipped), Table Row close-up fully framed (was: mostly off-frame), gallery CameraDemo final frame correct. pnpm verify green. docs/component-library.md Camera section rewritten (measured viewport, remaining legibility caveat); the PR 3 validate.ts rule is downgraded from primary fix to optional density-lint hardening.
 - PR 2 merged: https://github.com/FWcloud916/motife/pull/14 (merge commit 86b5bac). This session's scope (PR 0-2) is complete; next up is PR 3 (Diagram overflow bounding + validate.ts lints) in a future session. User policy update: pure progress-tracking closeout commits go directly to main from now on, no PR.
 - PR 3 implemented: safeArea.ts + SafeAreaContext (Scene provides the real content box, no behavior change to existing padding); estimateNodeSizes.ts (pure CJK-aware text-width estimator mirroring measureNodes.ts); Diagram.tsx standalone fit now caps at the safe area (letterbox, never clip; camera-nested untouched); validate.ts gains 4 layout-budget lints threaded via a new SceneLayoutBudget param (diagram_label_too_long/clipped/too_many_nodes on validateDiagram, camera_content_too_tall on validateCamera's existing subtree collection). Calibrated thresholds against real dagre runs + hand-measurement of all 3 baseline docs before writing any code (shrink-factor thresholds were ruled out -- baseline content legitimately sits at 0.34-0.47x; text-width/node-count/camera-height were the clean separators). pnpm verify green (245 tests); baseline smoke stills re-rendered pixel-identical (cap never binds anywhere, as calibrated); pnpm motife validate confirms jwt/mq clean and db-index emits exactly the intended camera_content_too_tall warning; a synthetic oversized doc demonstrated all 4 new lints firing with actionable fix text. docs/dsl-schema.md and docs/component-library.md updated, including fixing a stale pre-PR-2 Camera description in dsl-schema.md noticed along the way.
-- PR 3 opened: https://github.com/FWcloud916/motife/pull/15 (branch phase-4/diagram-overflow-bounding).
+- PR 3 opened: https://github.com/FWcloud916/motife/pull/15 (branch phase-4/diagram-overflow-bounding). Independently re-verified before merge (fresh session, no reliance on prior notes): re-ran pnpm verify (245 tests + smoke + audio smoke, all green), ran `motife validate` by hand on all 3 baselines (jwt/mq exit 0 clean, db-index exit 0 with exactly the intended camera_content_too_tall warning), and read every diff hunk end to end (errors.ts, validate.ts, Diagram.tsx, estimateNodeSizes.ts, safeArea.ts, parse.test.ts, both docs, barrel exports) -- matches the PR description precisely, no discrepancies found.
+- PR 3 merged: https://github.com/FWcloud916/motife/pull/15 (merge commit 7fbf2b9). Failure modes 1 (Diagram overflow) and 2 (Camera framing) are now both fully fixed; only failure mode 3 (TTS accent, PR 4) remains from the original Phase 3 queue. Next up: PR 4 (TTS model wiring + OpenAI/ElevenLabs A/B) in a future session.
 
 ## Outcome
 
