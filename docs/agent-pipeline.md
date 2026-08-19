@@ -42,7 +42,7 @@ can be continued in the other.
 | `critique --run DIR --iter N` | LLM (vision) | stills → `critique.json` / `critique.md` |
 | `revise --run DIR --iter N` | LLM | critique + current doc → corrected `doc.json` |
 | `run --prompt "…"` | LLM (+TTS) | full pipeline, bounded critique loop (default ≤2 revisions) |
-| `eval` | LLM (+TTS) | all 3 eval concepts end-to-end → `out/eval/<date>/report.md` with a human-scoring table |
+| `eval [--set baseline\|stress\|all]` | LLM (+TTS) | a concept set end-to-end → `out/eval/<date>/<set>[-<label>]/report.md` with a human-scoring table ("Eval sets" below) |
 
 Provider selection (generation): `--provider` / `--model` >
 `MOTIFE_PROVIDER` / `MOTIFE_MODEL` > defaults in `src/agent/providers.ts`.
@@ -123,6 +123,59 @@ scored best (a revision can regress layout, not just fix it), tying to the
 earliest iteration when scores match — see the run-dir contract above.
 Only a document that never validates fails the run.
 
+### Eval sets — baseline vs. stress
+
+`motife eval --set <name>` runs a named CONCEPT SET (`src/agent/conceptSets.ts`)
+through the loop above, one `runPipeline()` call per concept, sequentially:
+
+| Set | Concepts | Source | Purpose |
+|---|---|---|---|
+| `baseline` (default) | 3 | `src/agent/evalConcepts.ts` | Phase 3's acceptance run; also the regression check after any component/compiler fix — Phase 4's acceptance criterion 1 |
+| `stress` | 12 | `src/agent/stressConcepts.ts` | Phase 4's acceptance criterion 2: ≥10 concepts outside the eval set, ≥8 producing a passing MP4. Deliberately covers 4 axes the 3 baselines under-exercise (tree/graph depth, code/terminal, meter/pacing, multi-step Diagram+Camera) — see the file's header comment |
+| `all` | 15 | both, concatenated | `--only` across both sets; not an acceptance run on its own (baseline and stress are scored against different bars — keep them as separate `--set` invocations and separate archived reports) |
+
+`--only <slug>` (repeatable) filters WITHIN the selected set, not across all
+sets — `--set baseline --only binary-heap` is an error naming baseline's
+own slugs, not a silent empty result. Every concept still gets the same 3
+few-shot examples embedded in the system prompt (`prompt.ts` inlines all of
+`src/dsl/docs/*` regardless of `--set`) — the stress set's whole premise is
+measuring generalization *given* those examples, so `motife eval` never
+varies `--few-shot` itself.
+
+`--label <name>` distinguishes multiple same-day, same-set runs (a
+screening pass vs. a full pass) — it becomes part of the output directory
+(`out/eval/<date>/<set>-<label>/`), never a report filename collision.
+`report.md` is rewritten after every concept finishes, not just at the
+end, so a crash or a killed process partway through a multi-hour run
+doesn't lose the concepts that already completed.
+
+**Cost/time reality** (from the actual Phase 3 baseline run —
+`progress/2026-08-14-phase-3-agent-pipeline/eval-report-2026-08-15.md`:
+248s / 313s / 1102s per concept, the heaviest concept ≈367s/iteration; the
+pipeline is sequential and each concept re-bundles Remotion once):
+
+| Pass | Flags | Renders/concept | Baseline (3) | Stress (12) |
+|---|---|---|---|---|
+| Screening | `--no-audio --max-revisions 1` | ≤2 | a few minutes | ~1.5–2.5 h |
+| Full | default (≤2 revisions), audio on | ≤3 | ~15 min | ~2.5–4.5 h |
+
+A screening pass triages crashes and non-convergent concepts cheaply
+before paying for TTS + the full critique-loop vision cost on a full pass.
+Recommended runbook:
+
+```bash
+# 1. screening — cheap, no audio, finds concepts that crash or never converge
+pnpm motife eval --set stress --label screen --no-audio --max-revisions 1
+
+# 2. full pass — confirm the report's TTS line says elevenlabs before
+#    scoring 旁白 (the code default is OpenAI alloy; the A/B winner only
+#    lives in the main checkout's .env — see Configuration below)
+pnpm motife eval --set stress
+
+# 3. Phase 4 acceptance criterion 1 — baseline re-run after the PR 2/3/4 fixes
+pnpm motife eval --set baseline
+```
+
 ## 5. Configuration
 
 Copy `.env.example` → `.env` (gitignored; loaded via Node's
@@ -165,7 +218,7 @@ commented-out override block for the exact env vars.
 | Run-dir layout | `src/agent/rundir.ts`, `src/agent/runInputs.ts` |
 | Bundle/select/renderMedia/renderStill (one shared `inputProps`) | `src/agent/render.ts` |
 | Full loop orchestration | `src/agent/pipeline.ts` |
-| Eval concepts + runner | `src/agent/evalConcepts.ts`, `src/agent/commands/eval.ts` |
+| Eval concepts, sets, report rendering + runner | `src/agent/evalConcepts.ts`, `src/agent/stressConcepts.ts`, `src/agent/conceptSets.ts`, `src/agent/evalReport.ts`, `src/agent/commands/eval.ts` |
 | TTS providers / model+voice resolution / defaults / synthesis cache / duration backfill | `src/tts/` |
 | Frame selection / vision critique / report rendering | `src/critique/` |
 | Renderer-side audio sidecar + metadata passthrough | `src/compiler/render/audioManifest.ts`, `previewMetadata.ts`, `DslVideo.tsx` |

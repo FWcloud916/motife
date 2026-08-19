@@ -10,6 +10,7 @@
 import { copyFile, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { formatIssues, parseDocument } from "../compiler";
+import type { DslIssue } from "../compiler";
 import type { DslDocument } from "../dsl";
 import { critiqueFrames } from "../critique/frames";
 import type { CritiqueIssue, CritiqueStillImage } from "../critique/critique";
@@ -70,6 +71,15 @@ export interface IterationSummary {
   errors: number;
   warnings: number;
   issues: CritiqueIssue[];
+  /** Validation warnings on the document that produced THIS iteration's
+   * render — from the pre-TTS parse (PR 3's layout-budget lints are
+   * duration-independent; the post-TTS parse would add narration_pacing
+   * churn from backfilled durations). Empty for a doc with no warnings.
+   * Errors never appear here: an error-severity issue fails parseDocument,
+   * which either blocks generation entirely (generation-failed) or is
+   * impossible to reach mid-loop (every doc.json written here already
+   * passed parseDocument in generateDsl/reviseDsl). */
+  docWarnings: readonly DslIssue[];
 }
 
 export interface PipelineResult {
@@ -77,8 +87,16 @@ export interface PipelineResult {
   finalMp4: string | null;
   generateAttempts: number;
   iterations: IterationSummary[];
-  /** True when the loop ended because critique came back clean. */
+  /** True when the loop ended because critique came back clean. Equivalent
+   * to `outcome === "clean"` — kept as its own field since existing
+   * callers already read it. */
   clean: boolean;
+  /** How the run ended — see RunOutcome. Surfaced here (not just written
+   * to the run-dir report.md) so a caller like `motife eval` can render
+   * more than "clean" vs. "revision budget exhausted": a revision that
+   * never validated and a mid-run crash are different outcomes, not the
+   * same failure. */
+  outcome: RunOutcome;
   /** Which iteration's render was copied to final.mp4 — the best-scoring
    * one (fewest errors, then fewest warnings, then earliest on a tie), not
    * necessarily the last. Null when no iteration ever completed critique. */
@@ -142,6 +160,7 @@ export async function runPipeline(
       generateAttempts: generated.attempts.length,
       iterations: [],
       clean: false,
+      outcome: "generation-failed",
       shippedIteration: null,
       failureText: generated.failureText,
     };
@@ -166,7 +185,7 @@ export async function runPipeline(
     const iterPaths = iterationPaths(options.runRoot, iteration);
     const rawText = await readFile(paths.docJson, "utf8");
     const rawDoc: unknown = JSON.parse(rawText);
-    const doc = mustParse(rawDoc, paths.docJson);
+    const { doc, warnings: docWarnings } = mustParse(rawDoc, paths.docJson);
 
     // TTS (cache makes re-runs cheap; only changed narration re-synthesizes).
     let renderDoc: unknown = rawDoc;
@@ -187,7 +206,11 @@ export async function runPipeline(
         leadSeconds: options.ttsLeadSeconds,
         tailSeconds: options.ttsTailSeconds,
       });
-      renderedDoc = mustParse(renderDoc, "doc.tts.json (derived)");
+      // TTS-derived warnings (e.g. narration_pacing shifts) are discarded
+      // here on purpose — PR 3's layout-budget lints, which docWarnings
+      // exists to surface, are duration-independent, and the pre-TTS
+      // warnings captured above already cover them.
+      renderedDoc = mustParse(renderDoc, "doc.tts.json (derived)").doc;
       await writeFile(paths.docTtsJson, `${JSON.stringify(renderDoc, null, 2)}\n`, "utf8");
     }
 
@@ -232,7 +255,7 @@ export async function runPipeline(
     await writeFile(iterPaths.critiqueMd, markdown, "utf8");
 
     const { errors, warnings } = countBySeverity(report);
-    summaries.push({ iteration, errors, warnings, issues: report.issues });
+    summaries.push({ iteration, errors, warnings, issues: report.issues, docWarnings });
     log(`pipeline: iteration ${iteration} — ${errors} error(s), ${warnings} warning(s)`);
 
     // Ties keep the EARLIER iteration — a revision that doesn't improve on
@@ -299,19 +322,35 @@ export async function runPipeline(
     generateAttempts: generated.attempts.length,
     iterations: summaries,
     clean,
+    outcome,
     shippedIteration: best?.iteration ?? null,
   };
 }
 
-function mustParse(input: unknown, label: string): DslDocument {
+function mustParse(input: unknown, label: string): { doc: DslDocument; warnings: readonly DslIssue[] } {
   const result = parseDocument(input);
   if (!result.ok) {
     throw new Error(`pipeline: ${label} failed validation:\n${formatIssues(label, result.issues)}`);
   }
-  return result.doc;
+  return { doc: result.doc, warnings: result.warnings };
 }
 
-type RunOutcome = "clean" | "exhausted" | "revision-failed" | "aborted" | "generation-failed";
+export type RunOutcome = "clean" | "exhausted" | "revision-failed" | "aborted" | "generation-failed";
+
+/** Short, caller-facing labels for PipelineResult.outcome — the long prose
+ * lives in OUTCOME_NOTES below, for the run-dir's own report.md. Note
+ * "aborted" never reaches a CALLER: a throwing stage rethrows past the
+ * `finally` (see the try/finally comment above), so it only ever appears
+ * in the run-dir report.md written on the way out, never in a returned
+ * PipelineResult — a caller sees the rejection instead. Included here
+ * anyway for Record completeness and because OUTCOME_NOTES needs it. */
+export const OUTCOME_LABELS: Record<RunOutcome, string> = {
+  clean: "critique clean",
+  exhausted: "revision budget exhausted",
+  "revision-failed": "revision never validated",
+  aborted: "aborted mid-run",
+  "generation-failed": "generation never validated",
+};
 
 const OUTCOME_NOTES: Record<RunOutcome, string> = {
   clean: "Final render passed critique with zero errors.",

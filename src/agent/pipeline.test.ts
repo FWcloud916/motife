@@ -139,10 +139,17 @@ describe("runPipeline", () => {
     expect(result).toMatchObject({
       ok: true,
       clean: true,
+      outcome: "clean",
       generateAttempts: 1,
       shippedIteration: 1,
     });
-    expect(result.iterations).toEqual([{ iteration: 1, errors: 0, warnings: 0, issues: [] }]);
+    expect(result.iterations).toHaveLength(1);
+    expect(result.iterations[0]).toMatchObject({ iteration: 1, errors: 0, warnings: 0, issues: [] });
+    // VALID_DOC's narration (26 chars / 2s = 13 chars/sec) trips
+    // checkNarrationPacing's 12 chars/sec threshold on every scene — a
+    // zero-new-fixture proof that docWarnings is actually wired up.
+    expect(result.iterations[0].docWarnings).toHaveLength(4);
+    expect(result.iterations[0].docWarnings.every((w) => w.code === "narration_pacing")).toBe(true);
     expect(calls.renderedVideos).toHaveLength(1);
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
     expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
@@ -163,6 +170,7 @@ describe("runPipeline", () => {
     const result = await runPipeline(baseOptions(client), stages);
 
     expect(result.clean).toBe(true);
+    expect(result.outcome).toBe("clean");
     expect(result.iterations.map((summary) => summary.errors)).toEqual([1, 0]);
     expect(result.shippedIteration).toBe(2);
     expect(calls.renderedVideos).toHaveLength(2);
@@ -197,6 +205,7 @@ describe("runPipeline", () => {
 
     expect(result.ok).toBe(true);
     expect(result.clean).toBe(false);
+    expect(result.outcome).toBe("exhausted");
     expect(result.iterations).toHaveLength(2); // maxRevisions + 1
     expect(calls.renderedVideos).toHaveLength(2);
     expect(result.shippedIteration).toBe(1);
@@ -221,6 +230,7 @@ describe("runPipeline", () => {
     const result = await runPipeline({ ...baseOptions(client), maxRevisions: 2 }, stages);
 
     expect(result.iterations.map((summary) => summary.errors)).toEqual([1, 2, 1]);
+    expect(result.outcome).toBe("exhausted");
     expect(calls.renderedVideos).toHaveLength(3);
     // Iteration 3 ties iteration 1's score (1 error, 0 warnings) — the
     // EARLIER iteration ships, not the last one that merely matched it.
@@ -234,6 +244,7 @@ describe("runPipeline", () => {
     const result = await runPipeline({ ...baseOptions(client), maxRevisions: 1 }, stages);
 
     expect(result.iterations.map((summary) => summary.errors)).toEqual([2, 1]);
+    expect(result.outcome).toBe("exhausted");
     expect(calls.renderedVideos).toHaveLength(2);
     expect(result.shippedIteration).toBe(2);
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:2");
@@ -253,6 +264,7 @@ describe("runPipeline", () => {
 
     expect(result.ok).toBe(true);
     expect(result.clean).toBe(false);
+    expect(result.outcome).toBe("revision-failed");
     expect(result.iterations).toHaveLength(1); // loop broke after failed revision
     expect(calls.renderedVideos).toHaveLength(1);
     // doc.json still the original.
@@ -294,7 +306,13 @@ describe("runPipeline", () => {
     const client = new FakeLlmClient(["bad", "bad", "bad", "bad"]);
     const result = await runPipeline(baseOptions(client), stages);
 
-    expect(result).toMatchObject({ ok: false, clean: false, finalMp4: null, generateAttempts: 4 });
+    expect(result).toMatchObject({
+      ok: false,
+      clean: false,
+      outcome: "generation-failed",
+      finalMp4: null,
+      generateAttempts: 4,
+    });
     expect(calls.renderedVideos).toHaveLength(0);
     expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
       "never produced a valid document",
