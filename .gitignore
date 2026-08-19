@@ -12,6 +12,10 @@ build
 # Editor / OS
 .DS_Store
 
+# Nested git worktree checkouts created by agent tooling. Was only in
+# .git/info/exclude, which is local to one machine and not shared by a clone.
+.claude/worktrees/
+
 # Env
 .env
 .env.*
