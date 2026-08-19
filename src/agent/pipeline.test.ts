@@ -13,6 +13,7 @@ import type { TtsProvider } from "../tts/provider";
 import { FakeLlmClient } from "./fakeLlm";
 import type { PipelineStages } from "./pipeline";
 import { runPipeline } from "./pipeline";
+import { ProviderError } from "./providerError";
 import { stillFileName } from "./render";
 import type { RenderContext } from "./render";
 
@@ -373,5 +374,95 @@ describe("runPipeline", () => {
     await runPipeline(baseOptions(client), stages);
 
     expect(calls.prepareServeUrls).toEqual([undefined, "fake://bundle"]);
+  });
+
+  it("returns a completed resume without calling any stage or LLM", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    const options = baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)]));
+    const first = await runPipeline(options, stages);
+    expect(first.status).toBe("completed");
+
+    const second = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([])), resume: true },
+      {
+        buildSystemPrompt: async () => { throw new Error("must not build prompt"); },
+        prepareRender: async () => { throw new Error("must not prepare renderer"); },
+      },
+    );
+    expect(second).toEqual(first);
+    expect(calls.renderedVideos).toHaveLength(1);
+  });
+
+  it("pauses on a recoverable generation interruption and resumes generation", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    const interrupted = {
+      complete: async () => {
+        throw new ProviderError({ provider: "test", message: "quota exhausted", statusCode: 429, recoverable: true });
+      },
+    };
+    const first = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([])), generationClient: interrupted },
+      stages,
+    );
+    expect(first).toMatchObject({ status: "paused", ok: false, outcome: "paused" });
+    expect(calls.renderedVideos).toHaveLength(0);
+
+    const resumed = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])), resume: true },
+      stages,
+    );
+    expect(resumed.status).toBe("completed");
+    expect(calls.renderedVideos).toHaveLength(1);
+  });
+
+  it("reuses completed render and still checkpoints after critique pauses", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    const first = await runPipeline(baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])), {
+      ...stages,
+      runCritique: async () => {
+        throw new ProviderError({ provider: "vision", message: "network down", recoverable: true });
+      },
+    });
+    expect(first.status).toBe("paused");
+    expect(calls.renderedVideos).toHaveLength(1);
+
+    const resumed = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([])), resume: true },
+      stages,
+    );
+    expect(resumed.status).toBe("completed");
+    expect(calls.renderedVideos).toHaveLength(1);
+    expect(calls.critiques).toBe(1);
+  });
+
+  it("refuses a non-empty legacy directory without state", async () => {
+    const root = path.join(dir, "run");
+    await mkdir(root, { recursive: true });
+    await writeFile(path.join(root, "legacy.txt"), "old run");
+    const { stages } = fakeStages([CLEAN]);
+    await expect(runPipeline(baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])), stages)).rejects.toThrow(/not empty.*--resume/);
+  });
+
+  it("turns SIGINT during a stage into a paused checkpoint", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    let signalled = false;
+    const interruptedStages = {
+      ...stages,
+      renderVideo: async (context: Parameters<NonNullable<typeof stages.renderVideo>>[0], output: string) => {
+        if (!signalled) {
+          signalled = true;
+          process.emit("SIGINT");
+        }
+        await stages.renderVideo!(context, output);
+      },
+    };
+    const result = await runPipeline(
+      baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])),
+      interruptedStages,
+    );
+    expect(result).toMatchObject({ status: "paused", ok: false, outcome: "paused", failureText: "Interrupted by SIGINT" });
+    expect(calls.renderedVideos).toHaveLength(1);
+    const state = JSON.parse(await readFile(path.join(dir, "run", "run-state.json"), "utf8")) as { status: string; stage: string };
+    expect(state).toMatchObject({ status: "paused", stage: "render" });
   });
 });

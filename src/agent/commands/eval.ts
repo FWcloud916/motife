@@ -1,48 +1,48 @@
-// `motife eval` — runs a concept set (baseline/stress/all) end-to-end
-// (sequentially; each run already parallelizes nothing else on this
-// machine) and writes a human-scoring report. `--set baseline` (the
-// default) is Phase 3's acceptance run: three prompts in, three MP4s out,
-// no manual intervention. `--set stress` is Phase 4's: 12 concepts outside
-// the eval set and outside the system prompt's few-shot examples, probing
-// for failure modes the deterministic-fix rounds haven't hit yet.
-import { parseArgs } from "node:util";
-import { writeFile, mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseArgs } from "node:util";
+import { createTtsProvider } from "../../tts/provider";
+import type { TtsProvider } from "../../tts/provider";
+import { selectConcepts, CONCEPT_SETS } from "../conceptSets";
+import type { EvalSetName } from "../conceptSets";
+import type { ProviderName } from "../providers";
+import type { EvalRunResult } from "../evalReport";
+import { renderEvalReport } from "../evalReport";
 import { createLlmClient } from "../llm";
+import { persistedResult, runPipeline } from "../pipeline";
+import type { PipelineResult } from "../pipeline";
 import {
   resolveCritiqueModel,
   resolveCritiqueProvider,
   resolveModel,
   resolveProvider,
 } from "../providers";
-import { runPipeline } from "../pipeline";
-import { selectConcepts, CONCEPT_SETS } from "../conceptSets";
-import type { EvalRunResult } from "../evalReport";
-import { renderEvalReport } from "../evalReport";
+import {
+  assertConfigMatches,
+  assertDirectoryEmpty,
+  readEvalState,
+  writeEvalState,
+} from "../state";
+import type { EvalConceptState, EvalState, PipelineConfig } from "../state";
 import { OptionError, integerOption } from "./optionValues";
-import { createTtsProvider } from "../../tts/provider";
-import type { TtsProvider } from "../../tts/provider";
 
 const USAGE = `usage: pnpm motife eval [options]
-
-Runs a concept set through the full pipeline into
-out/eval/<date>/<set>[-<label>]/<concept>/ and writes report.md there with
-a human-scoring table.
+       pnpm motife eval --resume <eval-dir> [--retry-failed] [--only <slug>...]
 
 options:
-  --set baseline|stress|all           which concept set (default baseline;
-                                       ${CONCEPT_SETS.baseline.length} / ${CONCEPT_SETS.stress.length} / ${CONCEPT_SETS.all.length} concepts respectively)
-  --label <name>                      distinguishes same-day/same-set runs,
-                                       e.g. --label screen for a screening pass
-  --provider / --model                generation LLM (as in \`motife run\`)
+  --set baseline|stress|all           concept set (default baseline;
+                                       ${CONCEPT_SETS.baseline.length} / ${CONCEPT_SETS.stress.length} / ${CONCEPT_SETS.all.length})
+  --label <name>                      output label for a new eval
+  --resume <dir>                      resume persisted eval-state.json
+  --retry-failed                      retry failed concepts from their safe checkpoints
+  --only <slug>                       resume/run a subset (repeatable)
+  --provider / --model                generation LLM
   --lang <bcp47>                      narration language (default zh-TW)
-  --tts <name> / --voice <id>         TTS provider (default openai)
+  --tts <name> / --voice <id>         TTS provider and voice
   --tts-model <id> / --tts-instructions <text>
-                                       TTS model + OpenAI accent steering
-  --no-audio                          skip TTS (旁白 can't be scored)
+  --no-audio                          skip TTS
   --critique-provider / --critique-model
-  --max-revisions <n>                 default 2
-  --only <slug>                       run a single concept from the set (repeatable)`;
+  --max-revisions <n>                 default 2`;
 
 export async function run(argv: string[]): Promise<number> {
   let args;
@@ -50,151 +50,237 @@ export async function run(argv: string[]): Promise<number> {
     args = parseArgs({
       args: argv,
       options: {
-        set: { type: "string" },
-        label: { type: "string" },
-        provider: { type: "string" },
-        model: { type: "string" },
-        lang: { type: "string" },
-        tts: { type: "string" },
-        "tts-model": { type: "string" },
-        voice: { type: "string" },
-        "tts-instructions": { type: "string" },
-        "no-audio": { type: "boolean" },
-        "critique-provider": { type: "string" },
-        "critique-model": { type: "string" },
-        "max-revisions": { type: "string" },
-        only: { type: "string", multiple: true },
+        set: { type: "string" }, label: { type: "string" }, resume: { type: "string" },
+        "retry-failed": { type: "boolean" }, provider: { type: "string" }, model: { type: "string" },
+        lang: { type: "string" }, tts: { type: "string" }, "tts-model": { type: "string" },
+        voice: { type: "string" }, "tts-instructions": { type: "string" }, "no-audio": { type: "boolean" },
+        "critique-provider": { type: "string" }, "critique-model": { type: "string" },
+        "max-revisions": { type: "string" }, only: { type: "string", multiple: true },
         help: { type: "boolean", short: "h" },
       },
     });
-  } catch (err) {
-    console.error(`motife eval: ${(err as Error).message}\n\n${USAGE}`);
+  } catch (error) {
+    console.error(`motife eval: ${(error as Error).message}\n\n${USAGE}`);
     return 2;
   }
-  if (args.values.help) {
-    console.log(USAGE);
-    return 0;
-  }
-
-  const selection = selectConcepts(args.values.set, args.values.only);
-  if (!selection.ok) {
-    console.error(`motife eval: ${selection.message}\n\n${USAGE}`);
-    return 2;
-  }
-  const { set, concepts } = selection;
-
-  let label: string | null = null;
-  if (args.values.label !== undefined) {
-    if (!/^[a-z0-9-]+$/.test(args.values.label)) {
-      console.error(
-        `motife eval: --label must match [a-z0-9-]+ (it becomes a directory name), got "${args.values.label}"\n\n${USAGE}`,
-      );
-      return 2;
-    }
-    label = args.values.label;
-  }
+  if (args.values.help) { console.log(USAGE); return 0; }
 
   let maxRevisions: number | undefined;
   try {
     maxRevisions = integerOption("--max-revisions", args.values["max-revisions"], { min: 0 });
-  } catch (err) {
-    if (err instanceof OptionError) {
-      console.error(`motife eval: ${err.message}\n\n${USAGE}`);
+  } catch (error) {
+    if (error instanceof OptionError) { console.error(`motife eval: ${error.message}\n\n${USAGE}`); return 2; }
+    throw error;
+  }
+
+  let state: EvalState;
+  let evalRoot: string;
+  if (args.values.resume) {
+    evalRoot = args.values.resume;
+    try {
+      state = await readEvalState(evalRoot);
+      validateResumeSelection(state, args.values.only);
+    } catch (error) {
+      console.error(`motife eval: ${(error as Error).message}`);
       return 2;
     }
-    throw err;
+    const requested = requestedConfig(args.values, maxRevisions);
+    try { assertConfigMatches(state.config, requested); }
+    catch (error) { console.error(`motife eval: ${(error as Error).message}`); return 2; }
+    if (args.values.set !== undefined && args.values.set !== state.set) {
+      console.error(`motife eval: --set does not match persisted set ${state.set}`); return 2;
+    }
+    if (args.values.label !== undefined && args.values.label !== state.label) {
+      console.error("motife eval: --label does not match persisted label"); return 2;
+    }
+  } else {
+    const selection = selectConcepts(args.values.set, args.values.only);
+    if (!selection.ok) { console.error(`motife eval: ${selection.message}\n\n${USAGE}`); return 2; }
+    let label: string | null = null;
+    if (args.values.label !== undefined) {
+      if (!/^[a-z0-9-]+$/.test(args.values.label)) {
+        console.error(`motife eval: --label must match [a-z0-9-]+, got "${args.values.label}"`); return 2;
+      }
+      label = args.values.label;
+    }
+    const date = new Date().toISOString().slice(0, 10);
+    evalRoot = path.join("out", "eval", date, label ? `${selection.set}-${label}` : selection.set);
+    try { await assertDirectoryEmpty(evalRoot); }
+    catch (error) { console.error(`motife eval: ${(error as Error).message}`); return 2; }
+    const config = resolveNewConfig(args.values, maxRevisions);
+    state = {
+      kind: "motife-eval-state", schemaVersion: 1, contractVersion: 1, status: "pending",
+      set: selection.set, label, date, config,
+      concepts: selection.concepts.map((concept) => ({ ...concept, status: "pending", stage: "generate", elapsedMs: 0, lastError: null })),
+      elapsedMs: 0, lastError: null, updatedAt: new Date().toISOString(),
+    };
+    await writeEvalState(evalRoot, state);
   }
-  const resolvedMaxRevisions = maxRevisions ?? 2;
 
-  const provider = resolveProvider(args.values.provider);
-  const model = resolveModel(provider, args.values.model);
-  const critiqueProvider = resolveCritiqueProvider(args.values["critique-provider"]);
-  const critiqueModel = resolveCritiqueModel(critiqueProvider, args.values["critique-model"]);
-
-  // Constructed once, up front — the provider is a stateless closure over
-  // apiKey/voice/model, identical for every concept, so this doesn't
-  // change behavior; it fails fast before any LLM spend, and it gives
-  // renderEvalReport the config to record (an eval report that doesn't say
-  // which voice produced it isn't archivable — the same gap PR 1 closed
-  // for critique issues).
-  const ttsProvider: TtsProvider | null = args.values["no-audio"]
-    ? null
-    : createTtsProvider({
-        flag: args.values.tts,
-        voice: args.values.voice,
-        model: args.values["tts-model"],
-        instructions: args.values["tts-instructions"],
-      });
-
-  const date = new Date().toISOString().slice(0, 10);
-  const setDir = label ? `${set}-${label}` : set;
-  const evalRoot = path.join("out", "eval", date, setDir);
+  const config = state.config;
+  const ttsProvider = createTtsFromConfig(config);
   await mkdir(evalRoot, { recursive: true });
-  console.log(`eval: set=${set}${label ? ` label=${label}` : ""} root=${evalRoot} (${concepts.length} concept(s))`);
-
-  const results: EvalRunResult[] = [];
   const reportPath = path.join(evalRoot, "report.md");
+  const invocationStarted = Date.now();
+  const elapsedAtStart = state.elapsedMs;
+  const save = async (): Promise<void> => {
+    state.elapsedMs = elapsedAtStart + (Date.now() - invocationStarted);
+    await writeEvalState(evalRoot, state);
+    await writeFile(reportPath, renderStateReport(state, ttsProvider, evalRoot), "utf8");
+  };
+  let interrupted = false;
+  let activeConcept: EvalConceptState | null = null;
+  const onInterrupt = (): void => {
+    interrupted = true;
+    state.status = "paused";
+    state.lastError = "Interrupted by SIGINT";
+    if (activeConcept?.status === "running") {
+      activeConcept.status = "paused";
+      activeConcept.lastError = "Interrupted by SIGINT";
+    }
+    void save();
+  };
+  process.once("SIGINT", onInterrupt);
 
-  for (const concept of concepts) {
-    console.log(`\n=== eval: ${concept.slug} — ${concept.title} ===`);
+  try {
+    await save();
+    if (interrupted) return 130;
 
-    const started = Date.now();
-    try {
-      const result = await runPipeline({
-        prompt: concept.prompt,
-        runRoot: path.join(evalRoot, concept.slug),
-        generationClient: createLlmClient({ provider, model }),
-        critiqueClient: createLlmClient({ provider: critiqueProvider, model: critiqueModel }),
-        ttsProvider,
-        language: args.values.lang,
-        maxRevisions,
-        log: (line) => console.log(line),
-      });
-      results.push({
-        slug: concept.slug,
-        title: concept.title,
-        result,
-        error: result.ok ? null : (result.failureText ?? "no video produced"),
-        elapsedSeconds: Math.round((Date.now() - started) / 1000),
-      });
-    } catch (err) {
-      // One concept failing must not sink the other runs.
-      console.error(`eval: ${concept.slug} crashed — ${(err as Error).message}`);
-      results.push({
-        slug: concept.slug,
-        title: concept.title,
-        result: null,
-        error: (err as Error).message,
-        elapsedSeconds: Math.round((Date.now() - started) / 1000),
-      });
+    const only = new Set(args.values.only ?? state.concepts.map((concept) => concept.slug));
+    const eligible = state.concepts.filter((concept) => {
+      if (!only.has(concept.slug)) return false;
+      if (concept.status === "pending" || concept.status === "paused") return true;
+      return concept.status === "failed" && Boolean(args.values["retry-failed"]);
+    });
+    if (eligible.length === 0) {
+      console.log(`eval: no eligible concepts; report -> ${reportPath}`);
+      return state.status === "paused" ? 75 : state.concepts.some((c) => c.status === "failed") ? 1 : 0;
     }
 
-    // Rewritten after every concept, not just at the end — a 12-concept
-    // sequential run takes hours; a crash/kill partway through shouldn't
-    // lose the report for every concept that already finished.
-    await writeFile(
-      reportPath,
-      renderEvalReport({
-        date,
-        set,
-        label,
-        provider,
-        model,
-        maxRevisions: resolvedMaxRevisions,
-        ttsProvider,
-        results,
-      }),
-      "utf8",
-    );
+    state.status = "running";
+    await save();
+    if (interrupted) return 130;
+    for (const concept of eligible) {
+    if (interrupted) return 130;
+    activeConcept = concept;
+    console.log(`\n=== eval: ${concept.slug} — ${concept.title} ===`);
+    const started = Date.now();
+    const hasRunState = await stateFileExists(path.join(evalRoot, concept.slug, "run-state.json"));
+    concept.status = "running";
+    concept.lastError = null;
+    await save();
+    const runRoot = path.join(evalRoot, concept.slug);
+    let result: PipelineResult | null = null;
+    try {
+      result = await runPipeline({
+        prompt: concept.prompt, runRoot,
+        generationClient: createLlmClient({ provider: config.provider as Parameters<typeof createLlmClient>[0]["provider"], model: config.model }),
+        critiqueClient: createLlmClient({ provider: config.critiqueProvider as Parameters<typeof createLlmClient>[0]["provider"], model: config.critiqueModel }),
+        ttsProvider, config,
+        resume: hasRunState,
+        language: config.language, maxRevisions: config.maxRevisions,
+        log: (line) => console.log(line),
+      });
+      concept.result = result;
+      concept.status = result.status;
+      concept.lastError = result.failureText ?? null;
+    } catch (error) {
+      concept.status = "failed";
+      concept.lastError = (error as Error).message;
+      console.error(`eval: ${concept.slug} crashed — ${concept.lastError}`);
+    }
+    concept.elapsedMs += Date.now() - started;
+    try {
+      const runState = await import("../state").then((module) => module.readRunState(runRoot));
+      concept.stage = runState.stage;
+    } catch { /* run state may not exist if setup failed */ }
+    await save();
+
+    if (concept.status === "paused") {
+      state.status = "paused";
+      state.lastError = concept.lastError;
+      await save();
+      console.error(`eval: PAUSED — resume with pnpm motife eval --resume ${evalRoot}`);
+      return interrupted ? 130 : 75;
+    }
+    if (result?.status === "failed" && result.outcome === "aborted") {
+      state.status = "failed";
+      state.lastError = result.failureText ?? "fatal provider request";
+      await save();
+      return 1;
+    }
+    activeConcept = null;
   }
 
-  console.log(`\neval: report -> ${reportPath}`);
-
-  const failed = results.filter((entry) => entry.error !== null);
-  if (failed.length > 0) {
-    console.error(`eval: ${failed.length}/${results.length} concept(s) failed`);
-    return 1;
+    state.status = state.concepts.some((concept) => concept.status === "failed") ? "failed" :
+      state.concepts.every((concept) => concept.status === "completed") ? "completed" : "pending";
+    await save();
+    console.log(`\neval: report -> ${reportPath}`);
+    return state.status === "failed" ? 1 : 0;
+  } finally {
+    process.removeListener("SIGINT", onInterrupt);
   }
-  console.log(`eval: OK — ${results.length}/${results.length} concept(s) rendered`);
-  return 0;
 }
+
+function resolveNewConfig(values: Record<string, unknown>, maxRevisions: number | undefined): PipelineConfig {
+  const provider = resolveProvider(values.provider as string | undefined);
+  const critiqueProvider = resolveCritiqueProvider(values["critique-provider"] as string | undefined);
+  const tts = values["no-audio"] ? null : createTtsProvider({
+    flag: values.tts as string | undefined, voice: values.voice as string | undefined,
+    model: values["tts-model"] as string | undefined, instructions: values["tts-instructions"] as string | undefined,
+  });
+  return {
+    provider, model: resolveModel(provider, values.model as string | undefined),
+    critiqueProvider, critiqueModel: resolveCritiqueModel(critiqueProvider, values["critique-model"] as string | undefined),
+    language: (values.lang as string | undefined) ?? "zh-TW", maxRevisions: maxRevisions ?? 2,
+    tts: tts ? { name: tts.name, voice: tts.voice, model: tts.model, ...(tts.instructions ? { instructions: tts.instructions } : {}) } : null,
+  };
+}
+
+function requestedConfig(values: Record<string, unknown>, maxRevisions: number | undefined): Partial<PipelineConfig> {
+  const requested: Partial<PipelineConfig> = {};
+  if (values.provider !== undefined || envSet("MOTIFE_PROVIDER")) requested.provider = resolveProvider(values.provider as string | undefined);
+  const provider = (requested.provider ?? resolveProvider(undefined)) as ProviderName;
+  if (values.model !== undefined || envSet("MOTIFE_MODEL")) requested.model = resolveModel(provider, values.model as string | undefined);
+  if (values["critique-provider"] !== undefined || envSet("MOTIFE_CRITIQUE_PROVIDER")) requested.critiqueProvider = resolveCritiqueProvider(values["critique-provider"] as string | undefined);
+  const critiqueProvider = (requested.critiqueProvider ?? resolveCritiqueProvider(undefined)) as ProviderName;
+  if (values["critique-model"] !== undefined || envSet("MOTIFE_CRITIQUE_MODEL")) requested.critiqueModel = resolveCritiqueModel(critiqueProvider, values["critique-model"] as string | undefined);
+  if (values.lang !== undefined) requested.language = values.lang as string;
+  if (values["max-revisions"] !== undefined) requested.maxRevisions = maxRevisions;
+  if (values["no-audio"] || values.tts !== undefined || values.voice !== undefined || values["tts-model"] !== undefined || values["tts-instructions"] !== undefined || ["MOTIFE_TTS", "MOTIFE_TTS_MODEL", "MOTIFE_TTS_VOICE", "MOTIFE_TTS_INSTRUCTIONS"].some(envSet)) {
+    const tts = values["no-audio"] ? null : createTtsProvider({ flag: values.tts as string | undefined, voice: values.voice as string | undefined, model: values["tts-model"] as string | undefined, instructions: values["tts-instructions"] as string | undefined });
+    requested.tts = tts ? { name: tts.name, voice: tts.voice, model: tts.model, ...(tts.instructions ? { instructions: tts.instructions } : {}) } : null;
+  }
+  return requested;
+}
+
+function createTtsFromConfig(config: PipelineConfig): TtsProvider | null {
+  return config.tts ? createTtsProvider({ flag: config.tts.name, voice: config.tts.voice, model: config.tts.model, instructions: config.tts.instructions }) : null;
+}
+
+function validateResumeSelection(state: EvalState, only: string[] | undefined): void {
+  if (!only) return;
+  const legal = new Set(state.concepts.map((concept) => concept.slug));
+  const invalid = only.filter((slug) => !legal.has(slug));
+  if (invalid.length) throw new Error(`--only contains concept(s) outside persisted set: ${invalid.join(", ")}`);
+}
+
+function renderStateReport(state: EvalState, ttsProvider: TtsProvider | null, evalRoot: string): string {
+  const results: EvalRunResult[] = state.concepts.map((concept) => ({
+    slug: concept.slug, title: concept.title,
+    result: concept.result ? persistedResult(concept.result) : null,
+    error: concept.lastError,
+    elapsedSeconds: Math.round(concept.elapsedMs / 1000),
+    status: concept.status,
+    stage: concept.stage,
+    resumeCommand: `pnpm motife eval --resume ${evalRoot} --only ${concept.slug}${concept.status === "failed" ? " --retry-failed" : ""}`,
+  }));
+  return renderEvalReport({ date: state.date, set: state.set as EvalSetName, label: state.label, provider: state.config.provider, model: state.config.model, maxRevisions: state.config.maxRevisions, ttsProvider, results });
+}
+
+async function stateFileExists(file: string): Promise<boolean> {
+  try { await import("node:fs/promises").then((module) => module.stat(file)); return true; }
+  catch { return false; }
+}
+
+function envSet(name: string): boolean { return (process.env[name]?.trim().length ?? 0) > 0; }

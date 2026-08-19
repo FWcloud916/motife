@@ -8,6 +8,8 @@ import path from "node:path";
 
 export interface RunPaths {
   root: string;
+  /** Versioned, atomic pipeline checkpoint (never contains API keys). */
+  runStateJson: string;
   promptTxt: string;
   attemptsDir: string;
   /** The accepted, pre-TTS document — always the LATEST one accepted, even
@@ -31,6 +33,7 @@ export interface RunPaths {
 export function runPaths(root: string): RunPaths {
   return {
     root,
+    runStateJson: path.join(root, "run-state.json"),
     promptTxt: path.join(root, "prompt.txt"),
     attemptsDir: path.join(root, "attempts"),
     docJson: path.join(root, "doc.json"),

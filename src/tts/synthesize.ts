@@ -10,6 +10,7 @@ import type { AudioManifest, AudioManifestEntry } from "./manifest";
 import { narrationHash, parseAudioManifest } from "./manifest";
 import type { TtsProvider } from "./provider";
 import { DEFAULT_LEAD_SECONDS } from "./backfill";
+import { atomicWriteJson } from "../io/atomicJson";
 
 export interface SynthesizeDocOptions {
   /** Validated document — scene ids and narration come from here. */
@@ -25,6 +26,8 @@ export interface SynthesizeDocOptions {
   /** Injectable for tests; defaults to music-metadata's parseFile. */
   measureDurationSeconds?: (filePath: string) => Promise<number>;
   log?: (line: string) => void;
+  /** Called after each scene's audio and manifest entry are durable. */
+  onSceneComplete?: (sceneId: string, manifest: AudioManifest) => void | Promise<void>;
 }
 
 export interface SynthesizeDocResult {
@@ -53,6 +56,7 @@ export async function synthesizeDoc(options: SynthesizeDocOptions): Promise<Synt
     leadSeconds = DEFAULT_LEAD_SECONDS,
     measureDurationSeconds = measureWithMusicMetadata,
     log = () => {},
+    onSceneComplete,
   } = options;
 
   await mkdir(audioDir, { recursive: true });
@@ -78,6 +82,8 @@ export async function synthesizeDoc(options: SynthesizeDocOptions): Promise<Synt
       scenes[scene.id] = { ...prior, src, delaySeconds: leadSeconds };
       reused.push(scene.id);
       log(`tts: ${scene.id} unchanged (cached)`);
+      await atomicWriteJson(manifestPath, { scenes });
+      await onSceneComplete?.(scene.id, { scenes: { ...scenes } });
       continue;
     }
 
@@ -87,10 +93,12 @@ export async function synthesizeDoc(options: SynthesizeDocOptions): Promise<Synt
     const durationInSeconds = await measureDurationSeconds(filePath);
     scenes[scene.id] = { src, durationInSeconds, narrationHash: hash, delaySeconds: leadSeconds };
     synthesized.push(scene.id);
+    await atomicWriteJson(manifestPath, { scenes });
+    await onSceneComplete?.(scene.id, { scenes: { ...scenes } });
   }
 
   const manifest: AudioManifest = { scenes };
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await atomicWriteJson(manifestPath, manifest);
   return { manifest, synthesized, reused };
 }
 

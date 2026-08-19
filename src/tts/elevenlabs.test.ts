@@ -14,8 +14,8 @@ function fakeFetch(body: BodyInit = new Uint8Array([1, 2, 3])) {
 }
 
 describe("createElevenLabsTts", () => {
-  it("throws without ELEVENLABS_API_KEY", () => {
-    expect(() => createElevenLabsTts()).toThrow(/ELEVENLABS_API_KEY/);
+  it("reports a missing key at the paid boundary", async () => {
+    await expect(createElevenLabsTts({ voice: "v" }).synthesize("hi")).rejects.toThrow(/ELEVENLABS_API_KEY/);
   });
 
   it("throws without a voice id from any source", () => {

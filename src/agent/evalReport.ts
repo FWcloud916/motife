@@ -15,6 +15,9 @@ export interface EvalRunResult {
   result: PipelineResult | null;
   error: string | null;
   elapsedSeconds: number;
+  status?: "pending" | "running" | "paused" | "completed" | "failed";
+  stage?: "generate" | "tts" | "render" | "stills" | "critique" | "revise" | "finalize";
+  resumeCommand?: string;
 }
 
 export interface EvalReportOptions {
@@ -59,13 +62,28 @@ export function renderEvalReport(options: EvalReportOptions): string {
   for (const entry of results) {
     lines.push(`## ${entry.slug} — ${entry.title}`, "");
     if (entry.result === null) {
-      // Threw before/during runPipeline — there is no PipelineResult, so
-      // there is no `outcome` to report; don't imply one by pointing at a
-      // run-dir report.md that may not exist yet.
-      lines.push(`**CRASHED** mid-run after ${entry.elapsedSeconds}s: ${entry.error}`, "");
+      if (entry.status === "pending" || entry.status === "running" || entry.status === "paused") {
+        lines.push(
+          `**${entry.status.toUpperCase()}** — last safe stage: ${entry.stage ?? "generate"}.`,
+          ...(entry.error ? [`Last error: ${entry.error}`] : []),
+          ...(entry.resumeCommand ? [`Resume: \`${entry.resumeCommand}\``] : []),
+          "",
+        );
+      } else {
+        lines.push(`**CRASHED** mid-run after ${entry.elapsedSeconds}s: ${entry.error}`, ...(entry.resumeCommand ? [`Resume: \`${entry.resumeCommand}\``] : []), "");
+      }
       continue;
     }
     const r = entry.result;
+    if (r.status === "paused") {
+      lines.push(
+        `**PAUSED** after ${entry.elapsedSeconds}s — last safe stage: ${entry.stage ?? "generate"}.`,
+        `Last error: ${entry.error ?? r.failureText ?? "provider interrupted"}`,
+        ...(entry.resumeCommand ? [`Resume: \`${entry.resumeCommand}\``] : []),
+        "",
+      );
+      continue;
+    }
     if (!r.ok) {
       lines.push(
         `**FAILED** (${OUTCOME_LABELS[r.outcome]}) after ${entry.elapsedSeconds}s: ${entry.error}`,

@@ -44,6 +44,22 @@ can be continued in the other.
 | `run --prompt "…"` | LLM (+TTS) | full pipeline, bounded critique loop (default ≤2 revisions) |
 | `eval [--set baseline\|stress\|all]` | LLM (+TTS) | a concept set end-to-end → `out/eval/<date>/<set>[-<label>]/report.md` with a human-scoring table ("Eval sets" below) |
 
+Long-running API-mode jobs are resumable from versioned checkpoints:
+
+```bash
+pnpm motife run --resume <run-dir> [--retry-failed]
+pnpm motife eval --resume <eval-dir> [--retry-failed] [--only <slug>...]
+```
+
+Resume runs `paused` and `pending` work by default. A `failed` run/concept
+requires `--retry-failed`; completed work is a no-op (no provider or renderer
+call). `eval --only` may select only slugs already present in the persisted
+concept list. Prompt, set, label, concept order, provider/model, TTS, language,
+and revision budget come from state. An explicitly supplied flag or non-empty
+`MOTIFE_*` override that disagrees with state exits 2 and asks for a new run.
+API keys are deliberately not persisted or compared, so a key can be topped up
+or replaced before resume.
+
 Provider selection (generation): `--provider` / `--model` >
 `MOTIFE_PROVIDER` / `MOTIFE_MODEL` > defaults in `src/agent/providers.ts`.
 Critique has independent `--critique-provider` / `--critique-model`
@@ -61,6 +77,7 @@ steering) — setting it for ElevenLabs is a hard error, not a silent no-op.
 ```text
 out/runs/<name>/
 ├── prompt.txt                  # the input concept
+├── run-state.json              # atomic/versioned stage checkpoint; no secrets
 ├── attempts/                   # generate retry history: 01.dsl.json, 01.issues.txt, ...
 ├── doc.json                    # the LATEST accepted document (pre-TTS) — the canonical editable artifact
 ├── doc.final.json              # the pre-TTS document that produced the SHIPPED iteration (see below)
@@ -77,6 +94,14 @@ out/runs/<name>/
 ├── final.mp4
 └── report.md
 ```
+
+An eval root similarly owns `eval-state.json`, which records the immutable
+batch configuration and every concept from the start (`pending | running |
+paused | completed | failed`), including elapsed time, last safe stage, result,
+and last error. Both state files use a same-directory temporary file followed
+by rename. Unknown schema/contract versions and corrupt state fail before any
+provider call. A non-empty directory without state is a legacy run and is not
+auto-imported: choose a new label/run directory.
 
 Rules the layout encodes:
 
@@ -105,6 +130,16 @@ Rules the layout encodes:
   `inputProps` (`DslVideoProps.audio`); an mp3 path is an asset binding
   and would break the DSL's renderer-agnostic rule if it lived in the
   schema.
+- **Stage artifacts are hash-bound checkpoints.** TTS, render, stills, and
+  critique record their input hashes. Resume reuses an artifact only when the
+  hash matches and the expected file is present/non-empty; otherwise it restarts
+  at that stage. Accepted generation/revision JSON and accepted critique output
+  are checkpointed before their ordinary artifact files, avoiding a repeated
+  paid call after a later local write failure.
+- **TTS is durable per scene.** Each completed MP3 is measured and immediately
+  added to an atomically rewritten `audio-manifest.json`. If scene 3 pauses on
+  quota, scenes 1–2 remain reusable; resume uses the narration hash to synthesize
+  only missing or changed scenes.
 
 ## 4. The critique loop (API mode)
 
@@ -148,6 +183,24 @@ screening pass vs. a full pass) — it becomes part of the output directory
 `report.md` is rewritten after every concept finishes, not just at the
 end, so a crash or a killed process partway through a multi-hour run
 doesn't lose the concepts that already completed.
+
+The report is derived from `eval-state.json`, so pending/paused/failed concepts
+also appear from the beginning with their last safe stage and an exact resume
+command. A provider interruption classified as recoverable (quota/credits,
+billing, final 429, 401/403, network failure, or 5xx) checkpoints the current
+run, pauses the entire batch before the next concept, and exits 75. Other
+provider 4xx responses are fatal configuration/request errors and stop the
+batch. Document validation, rendering, and other local failures mark only that
+concept failed; the batch continues, and `--retry-failed` can later retry it
+from its last checkpoint. The AI SDK retains responsibility for its own LLM
+retry policy; Motife does not stack another implicit LLM retry, and TTS retries
+only when the operator explicitly resumes.
+
+`SIGINT` is handled as an operator pause: the active run and eval concept are
+written as `paused` before the command exits 130, and no later stage or concept
+is started. If the process is killed before that handler can finish, the next
+state read treats stale `running` records as interrupted/paused and preserves
+their recorded stage for resume.
 
 **Cost/time reality** (from the actual Phase 3 baseline run —
 `progress/2026-08-14-phase-3-agent-pipeline/eval-report-2026-08-15.md`:

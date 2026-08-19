@@ -14,8 +14,8 @@ function fakeFetch(body: BodyInit = new Uint8Array([1, 2, 3])) {
 }
 
 describe("createOpenAiTts", () => {
-  it("throws without OPENAI_API_KEY", () => {
-    expect(() => createOpenAiTts()).toThrow(/OPENAI_API_KEY/);
+  it("reports a missing key at the paid boundary", async () => {
+    await expect(createOpenAiTts().synthesize("hi")).rejects.toThrow(/OPENAI_API_KEY/);
   });
 
   it("defaults to alloy / gpt-4o-mini-tts and omits instructions entirely when unset", async () => {

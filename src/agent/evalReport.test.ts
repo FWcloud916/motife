@@ -13,6 +13,7 @@ const TTS: TtsProvider = {
 
 function cleanResult(): PipelineResult {
   return {
+    status: "completed",
     ok: true,
     finalMp4: "concept/final.mp4",
     generateAttempts: 1,
@@ -25,6 +26,7 @@ function cleanResult(): PipelineResult {
 
 function exhaustedResultWithWarnings(): PipelineResult {
   return {
+    status: "completed",
     ok: true,
     finalMp4: "concept/final.mp4",
     generateAttempts: 1,
@@ -172,5 +174,16 @@ describe("renderEvalReport", () => {
     ];
     const out = renderEvalReport(baseOptions({ results }));
     expect(out).not.toMatch(/\/Users\/|\/home\/|C:\\/);
+  });
+
+  it("lists pending and paused concepts with their last safe stage and resume command", () => {
+    const results: EvalRunResult[] = [
+      { slug: "pending", title: "Pending", result: null, error: null, elapsedSeconds: 0, status: "pending", stage: "generate", resumeCommand: "pnpm motife eval --resume out/eval/x --only pending" },
+      { slug: "paused", title: "Paused", result: { ...cleanResult(), status: "paused", ok: false, outcome: "paused", failureText: "quota" }, error: "quota", elapsedSeconds: 10, status: "paused", stage: "critique", resumeCommand: "pnpm motife eval --resume out/eval/x --only paused" },
+    ];
+    const out = renderEvalReport(baseOptions({ results }));
+    expect(out).toContain("**PENDING** — last safe stage: generate");
+    expect(out).toContain("**PAUSED** after 10s — last safe stage: critique");
+    expect(out).toContain("pnpm motife eval --resume out/eval/x --only paused");
   });
 });
