@@ -82,6 +82,19 @@ rendering layer (版面/旁白), consistent with motife-plan.md §2 分層原則
 - **This session's scope:** progress tracking (this PR) + PR 1 (keep-best +
   critique archival) + PR 2 (Camera clamp). PRs 3-8 are follow-on work,
   tracked below but not started.
+- **Rust pivot committed (2026-08-19)** — the post-Phase-4 route is now a
+  pure-Rust application, staged as motife-plan.md §3 Phase 5 (pipeline,
+  ~63% of the TypeScript, no browser dependency) → Phase 6 (clean-room
+  render engine, ~4,300 browser-bound lines) → Phase 7 (single binary + a
+  rebuilt web interface). Drivers: delivery form (single-binary native app;
+  Node + pnpm + headless Chromium is too heavy) and render cost/speed. **No
+  change to Phase 4's scope or ordering** — Phase 4 must be fully accepted
+  first, precisely because it is the component library's last big round of
+  churn, and rewriting a renderer against a moving component library would
+  mean chasing two moving targets. Two consequences land inside this item:
+  PR 7 is scope-capped (see the PR table), and any new DSL field added by
+  PR 6's fixes must be implementable by `vello`/`taffy`/`cosmic-text`, not
+  just by Remotion (now an AGENTS.md hard constraint).
 
 ### Deeper finding from PR 2 verification: Camera's viewport assumption is violated in db-index itself
 
@@ -224,7 +237,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | 4 | TTS model wiring + A/B | `--tts-model`/`--tts-instructions`/`MOTIFE_TTS_*` wired; narration-hash includes model+instructions; A/B run complete — winner ElevenLabs "Xu Ming", applied as an `.env` override (see finding below) | Audio re-synthesis only (gitignored `out/` only; zero baseline audio exists) | done ([#16](https://github.com/FWcloud916/motife/pull/16)) |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
-| 7 | `@remotion/player` preview page | `npx remotion add @remotion/player` (pinned, never `pnpm add`); `node:http` server using the run-dir as state; new `web/` workspace (Vite); preview available at "audio-ready" (post-TTS, pre-final-render), honoring the TTS-driven-timeline rule | No | not started |
+| 7 | `@remotion/player` preview page | `npx remotion add @remotion/player` (pinned, never `pnpm add`); `node:http` server using the run-dir as state; new `web/` workspace (Vite); preview available at "audio-ready" (post-TTS, pre-final-render), honoring the TTS-driven-timeline rule. **Scope-capped 2026-08-19:** this page has a known sunset (Phase 6 replaces the render engine and `@remotion/player` goes with it) — build it thin, to validate the prompt→preview→download interaction, not as a durable frontend | No | not started |
 | 8 | Publish-form decision + docs closeout | User decision recorded in motife-plan.md; docs sweep (component-library.md, dsl-schema.md, agent-pipeline.md) with Last-updated bumps | No | not started |
 
 ### This session's tasks (PR 0-2)
