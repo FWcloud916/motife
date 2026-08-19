@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Anyone driving `pnpm motife`; coding agents in skill mode
-> **Last updated:** 2026-08-18
+> **Last updated:** 2026-08-19
 >
 > Phase 3's prompt→MP4 pipeline: the `motife` CLI, the run-directory
 > contract, and configuration. Schema/document reference:
@@ -144,6 +144,14 @@ OpenAI TTS reuses `OPENAI_API_KEY`. Default LLM model ids live in one
 table (`src/agent/providers.ts`); default TTS model/voice ids live in a
 separate one (`src/tts/defaults.ts`) — both will drift as vendors ship,
 override with flags/env rather than treating either table as authoritative.
+
+**zh-TW narration accent (Phase 3 failure mode 3, resolved via A/B):** the
+code default stays OpenAI `alloy` — a safe, zero-config fallback — but the
+Phase 4 A/B (`progress/2026-08-17-phase-4-polish-and-publish/tts-ab/`)
+picked ElevenLabs' "Xu Ming" (`taiwan mandarin`) voice over it. That
+verdict is NOT a code default, because an ElevenLabs voice id only works
+once it's in *your* account's voice library — see `.env.example`'s
+commented-out override block for the exact env vars.
 
 ## 6. Implementation map
 

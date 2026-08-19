@@ -5,7 +5,7 @@
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
-**Updated:** 2026-08-18
+**Updated:** 2026-08-19
 
 ---
 
@@ -34,7 +34,12 @@ Source: `progress/2026-08-14-phase-3-agent-pipeline/eval-report-2026-08-15.md`
 1. **TTS 中文旁白口音重**(OpenAI `gpt-4o-mini-tts`, voice=`alloy`)—
    **3/3 concepts** (jwt-auth, mq-backpressure, db-index). Every concept's
    旁白 score was capped at 3/5 by this alone — the single lowest-scoring
-   dimension across the whole eval.
+   dimension across the whole eval. **RESOLVED (PR 4, 2026-08-18):** A/B
+   winner is ElevenLabs "Xu Ming" (`A3T1GnLHdn0WL5w4TMtq`, taiwan mandarin,
+   `eleven_multilingual_v2`) over OpenAI alloy — see `tts-ab/LISTEN.md`.
+   Applied as a `.env`-level override (main checkout), not a code default,
+   since the voice id is account-specific; `.env.example` documents the
+   override.
 2. **Diagram 節點卡片過大遭畫面裁切** — **2/3 concepts** (mq-backpressure,
    db-index). Critique correctly flags it as overflow, but the critic is
    forbidden from suggesting pixel/coordinate fixes (DSL hard rule), so the
@@ -174,6 +179,24 @@ to me in this session. So PR 4's scope is deliberately split:
   recommendation — flagged in the harness README, since a hardcoded
   zh-TW default would be wrong for `--lang en`).
 
+**Resolution (2026-08-18, same day, folded into this PR rather than a
+separate 4b — PR #16 hadn't merged yet):** all 7 candidates were generated
+(ElevenLabs' account had zero Chinese voices; two `taiwan mandarin` ones
+were found in the *shared* voice library and added to the account after
+explicit user confirmation, since that's a real third-party account
+mutation) and delivered to the user as files. User filled `LISTEN.md`:
+winner is ElevenLabs "Xu Ming" — best 口音自然度 (4 vs OpenAI's 3 across
+every candidate, with or without accent-steering instructions). This
+answers R8 from PR 4's original risk list ("voice, not instructions,
+turned out to matter") and, less expectedly, crossed the vendor boundary
+entirely — none of the OpenAI instructions variants closed the gap.
+Applied as an env-level override on the main checkout's `.env` (not the
+code default — an ElevenLabs voice id is account-specific, so baking it
+into `src/tts/defaults.ts` would break any environment without that exact
+voice added to its own library) plus a commented-out recipe in
+`.env.example` and a note in `docs/agent-pipeline.md`. **Failure mode 3 is
+now resolved** — all three Phase 3 failure modes are closed as of this PR.
+
 ### Proposed Phase 4 acceptance criterion
 
 motife-plan.md §3 Phase 4 has no 驗收 line today (a gap vs. Phases 0-3).
@@ -239,6 +262,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 4 — A/B harness (`tts-ab/{fixture.doc.json,README.md,LISTEN.md}`) — defaults left unchanged; see finding above
 - [x] PR 4 — Full verification: `pnpm verify` green (282 tests), `motife {run,tts,eval} --help` show the new flags, fixture doc validates clean
 - [x] PR 4 — Open PR
+- [x] PR 4 — A/B run: all 7 candidates generated (incl. adding 2 ElevenLabs zh voices to the account after confirmation) and delivered; user scored `LISTEN.md`, winner is ElevenLabs "Xu Ming" — applied as a `.env` override (main checkout) + documented in `.env.example`/`docs/agent-pipeline.md`; failure mode 3 marked resolved — folded into PR #16 rather than a separate 4b since it hadn't merged yet
 
 ## Work log
 
@@ -263,6 +287,10 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 4 implemented: TtsProvider gains model + instructions (both narration-hash inputs); createOpenAiTts/createElevenLabsTts thread model (already accepted, never wired) and OpenAI gets a net-new conditional instructions field (omitted entirely for models that reject it, e.g. tts-1). New src/tts/defaults.ts centralizes DEFAULT_TTS_MODELS/DEFAULT_OPENAI_TTS_VOICE as a dependency-free leaf module. New resolveTtsModel/resolveTtsVoice/resolveTtsInstructions mirror providers.ts's flag>env>default pattern (MOTIFE_TTS_MODEL/MOTIFE_TTS_VOICE/MOTIFE_TTS_INSTRUCTIONS); ElevenLabs + instructions throws a named error instead of silently dropping it. narrationHash changed from positional args + newline-joining to an object param + JSON-tuple encoding -- fixes both the reported bug (model wasn't hashed, so switching models silently reused cached audio) and a latent one found while implementing (newline-joined instructions/narration could collide across the field boundary). --tts-model/--tts-instructions wired into run.ts/tts.ts/eval.ts; eval.ts's TTS provider hoisted out of the per-concept loop (stateless, fails fast, lets the report record it) and renderEvalReport now has a TTS config line -- an eval report is now self-describing the same way PR 1 made critique issues self-describing. 5 new test files (defaults covered via provider.test.ts's table-completeness case; manifest.test.ts has a pinned-hash canary + injection-collision regression test; provider.test.ts covers all 4 resolvers + precedence; openai.test.ts/elevenlabs.test.ts assert actual request bodies via a typed fetch mock, proving the flags really reach the wire) -- all keyless (vi.stubEnv + stubbed fetch, no network). pnpm verify green (282 tests). Defaults left UNCHANGED (alloy/gpt-4o-mini-tts) on purpose -- I have no audio-listening capability, so I cannot judge accent naturalness myself. Shipped a ready-to-run A/B harness instead (progress/2026-08-17-phase-4-polish-and-publish/tts-ab/: fixture.doc.json with 4 scenes' narration copied verbatim from the 3 baselines -- clean-Mandarin control, loanword-dense, worst-case code-switching, closing cadence -- a 7-candidate matrix in README.md using the real motife tts CLI, and a LISTEN.md scoring sheet). User listens, picks a winner, and a small PR 4b edits src/tts/defaults.ts (and decides whether zh-TW instructions become an opt-in .env recommendation or stay purely manual -- flagged as a real policy question, not a one-line change, since a hardcoded zh instruction default would be wrong for --lang en).
 - PR 4 opened: https://github.com/FWcloud916/motife/pull/16 (branch phase-4/tts-model-wiring).
 - TTS A/B candidates generated and delivered: ran all 7 candidates in tts-ab/README.md's matrix through the real pnpm motife tts CLI (sourcing the main checkout's .env inline, no secrets copied into the worktree). ElevenLabs account had zero Chinese voices; found two labeled 'taiwan mandarin' in ElevenLabs' shared voice library (Xu Ming, Roy - Taiwanese Youth) via the /v1/shared-voices API, asked the user before adding them to their account (a real third-party account mutation), user approved both, added via /v1/voices/add. All 28 mp3s (7 candidates x 4 fixture scenes) generated successfully and sent to the user directly as files for listening. tts-ab/README.md and LISTEN.md updated with the actual voice ids used (replacing the <ZH_VOICE_ID> placeholder) so the harness is reproducible. Audio files themselves are gitignored (out/tts-ab/), not committed -- only the harness docs were updated. Next: user listens and fills LISTEN.md, then a small PR 4b picks the winner.
+
+### 2026-08-19
+
+- TTS A/B resolved same-day: user filled LISTEN.md, winner is ElevenLabs 'Xu Ming' (A3T1GnLHdn0WL5w4TMtq, taiwan mandarin, eleven_multilingual_v2) -- beat every OpenAI candidate (with and without accent-steering instructions) on accent naturalness. Applied as a .env-level override on the main checkout (MOTIFE_TTS=elevenlabs, ELEVENLABS_VOICE_ID=A3T1GnLHdn0WL5w4TMtq, MOTIFE_TTS_MODEL=eleven_multilingual_v2) -- deliberately NOT a src/tts/defaults.ts code default, since the voice id only works once added to the specific ElevenLabs account's library (verified: the account had zero Chinese voices until two taiwan-mandarin candidates were found via the shared voice library and added after explicit user confirmation). .env.example documents the override as a commented-out recipe; docs/agent-pipeline.md's Configuration section records the decision; tts-ab/LISTEN.md marks itself done. All three Phase 3 failure modes are now resolved (1: PR 3, 2: PR 2, 3: this). Folded into PR #16 (still open) rather than a separate PR 4b.
 
 ## Outcome
 
