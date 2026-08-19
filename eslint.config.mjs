@@ -1,6 +1,27 @@
 import { config } from "@remotion/eslint-config-flat";
 
 export default [
+  {
+    // Global ignores. A config object with ONLY `ignores` applies to the
+    // whole run, unlike the per-block `files` filters below.
+    //
+    // `.claude/` is agent tooling, and `.claude/worktrees/` holds nested git
+    // worktree checkouts — full copies of this repo. Without this, `eslint .`
+    // walks into them and lints another branch's `src/` and `scripts/` as if
+    // they were ours. That is not merely wasted work (251 worktree files vs
+    // 123 real ones when this was added): the `files: ["scripts/**/*.mjs"]`
+    // override below is anchored at the project root, so it does NOT match
+    // `.claude/worktrees/*/scripts/*.mjs` — the Node globals never apply
+    // there and every `process`/`console` reference reports `no-undef`. The
+    // effect is that `pnpm verify` fails for anyone who has a worktree open,
+    // with errors pointing at files they never touched.
+    //
+    // `out/` and `coverage/` are gitignored build/report output. ESLint's
+    // flat config already ignores `node_modules/` and `.git/` by default,
+    // and it does not read `.gitignore` (nor `.git/info/exclude`, which is
+    // where `.claude/worktrees/` had been excluded from git alone).
+    ignores: [".claude/**", "out/**", "coverage/**"],
+  },
   ...config,
   {
     // @remotion/eslint-config-flat targets Remotion source (browser
