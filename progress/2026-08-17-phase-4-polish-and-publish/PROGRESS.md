@@ -1,7 +1,7 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** review
+**Status:** in-progress
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | `phase-4/tts-model-wiring` | N/A |  |
+| `motife` | TBD | N/A |  |
 
 ## Background & goals
 
@@ -221,7 +221,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | 1 | keep-best + critique archival | `pipeline.ts` ships best iteration (not last); eval report inlines critique issues (self-contained, archivable) | No | done ([#13](https://github.com/FWcloud916/motife/pull/13)) |
 | 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | done ([#14](https://github.com/FWcloud916/motife/pull/14)) |
 | 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram (component-layer guarantee) + 4 `validate.ts` lints: `diagram_label_too_long`/`diagram_label_clipped`(error)/`diagram_too_many_nodes` (estimated text/node-count budgets) + `camera_content_too_tall` (the density-lint hardening — height-only, estimation-immune) | **Yes** | done ([#15](https://github.com/FWcloud916/motife/pull/15)) |
-| 4 | TTS model wiring + A/B | `--tts-model`/`--tts-instructions`/`MOTIFE_TTS_*` wired; narration-hash includes model+instructions; ready-to-run A/B harness (`tts-ab/`) for OpenAI voices/instructions **and** ElevenLabs — defaults left unchanged pending human listening (see finding below) | Audio re-synthesis only (gitignored `out/` only; zero baseline audio exists) | review ([#16](https://github.com/FWcloud916/motife/pull/16)) |
+| 4 | TTS model wiring + A/B | `--tts-model`/`--tts-instructions`/`MOTIFE_TTS_*` wired; narration-hash includes model+instructions; A/B run complete — winner ElevenLabs "Xu Ming", applied as an `.env` override (see finding below) | Audio re-synthesis only (gitignored `out/` only; zero baseline audio exists) | done ([#16](https://github.com/FWcloud916/motife/pull/16)) |
 | 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
 | 7 | `@remotion/player` preview page | `npx remotion add @remotion/player` (pinned, never `pnpm add`); `node:http` server using the run-dir as state; new `web/` workspace (Vite); preview available at "audio-ready" (post-TTS, pre-final-render), honoring the TTS-driven-timeline rule | No | not started |
@@ -291,6 +291,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 ### 2026-08-19
 
 - TTS A/B resolved same-day: user filled LISTEN.md, winner is ElevenLabs 'Xu Ming' (A3T1GnLHdn0WL5w4TMtq, taiwan mandarin, eleven_multilingual_v2) -- beat every OpenAI candidate (with and without accent-steering instructions) on accent naturalness. Applied as a .env-level override on the main checkout (MOTIFE_TTS=elevenlabs, ELEVENLABS_VOICE_ID=A3T1GnLHdn0WL5w4TMtq, MOTIFE_TTS_MODEL=eleven_multilingual_v2) -- deliberately NOT a src/tts/defaults.ts code default, since the voice id only works once added to the specific ElevenLabs account's library (verified: the account had zero Chinese voices until two taiwan-mandarin candidates were found via the shared voice library and added after explicit user confirmation). .env.example documents the override as a commented-out recipe; docs/agent-pipeline.md's Configuration section records the decision; tts-ab/LISTEN.md marks itself done. All three Phase 3 failure modes are now resolved (1: PR 3, 2: PR 2, 3: this). Folded into PR #16 (still open) rather than a separate PR 4b.
+- PR 4 merged: https://github.com/FWcloud916/motife/pull/16 (merge commit c788a9d). All three Phase 3 failure modes are now resolved (1: Diagram overflow, PR 3 / #15; 2: Camera framing, PR 2 / #14; 3: TTS accent, PR 4 / #16 -- winner ElevenLabs Xu Ming, applied as an .env override). Next up: PR 5 (10+ concept stress test) in a future session.
 
 ## Outcome
 
