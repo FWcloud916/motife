@@ -2,7 +2,7 @@
 
 > **Type:** Reference
 > **Audience:** Anyone driving `pnpm motife`; coding agents in skill mode
-> **Last updated:** 2026-08-17
+> **Last updated:** 2026-08-19
 >
 > Phase 3's prompt→MP4 pipeline: the `motife` CLI, the run-directory
 > contract, and configuration. Schema/document reference:
@@ -36,7 +36,7 @@ can be continued in the other.
 |---|---|---|
 | `generate --prompt "…"` | LLM | prompt → validated `doc.json` (formatIssues retry loop, max 4 attempts) |
 | `validate <doc.json>` | none | `parseDocument()` + `formatIssues()`; exit 0 valid / 1 invalid |
-| `tts [doc.json] --run DIR` | TTS | per-scene narration audio + `audio-manifest.json` + `doc.tts.json` |
+| `tts [doc.json] --run DIR` | TTS | per-scene narration audio (`--tts-model`/`--tts-instructions` override the voice/model/steering) + `audio-manifest.json` + `doc.tts.json` |
 | `render [doc.json] --run DIR` | none | MP4 via the `DslPreview` composition (+ narration when the manifest exists) |
 | `stills [doc.json] --run DIR` | none | 3 critique key frames per scene (early/mid/late, 960×540 jpeg) |
 | `critique --run DIR --iter N` | LLM (vision) | stills → `critique.json` / `critique.md` |
@@ -49,8 +49,12 @@ Provider selection (generation): `--provider` / `--model` >
 Critique has independent `--critique-provider` / `--critique-model`
 (default anthropic — must be vision-capable; Groq/xAI vision support is
 model-dependent). TTS: `--tts openai|elevenlabs` (default openai);
-ElevenLabs additionally needs a voice id (`--voice` or
-`ELEVENLABS_VOICE_ID`).
+`--tts-model` / `--voice` / `--tts-instructions` each resolve flag >
+`MOTIFE_TTS_MODEL` / `MOTIFE_TTS_VOICE` / `MOTIFE_TTS_INSTRUCTIONS` >
+defaults in `src/tts/defaults.ts`. ElevenLabs additionally needs a voice id
+(`--voice` > `MOTIFE_TTS_VOICE` > `ELEVENLABS_VOICE_ID`, in that order);
+`--tts-instructions` is OpenAI-only (`gpt-4o-mini-tts`'s accent/style
+steering) — setting it for ElevenLabs is a hard error, not a silent no-op.
 
 ## 3. Run-directory contract
 
@@ -82,8 +86,9 @@ Rules the layout encodes:
   directories.
 - **`doc.json` is the only editable artifact.** `doc.tts.json` is derived —
   edit `doc.json` and re-run `motife tts`. The narration hash
-  (provider+voice+text) means only scenes whose narration changed are
-  re-synthesized.
+  (provider+voice+model+instructions+text) means only scenes whose inputs
+  actually changed are re-synthesized — that includes a `--tts-model` or
+  `--tts-instructions` change, not just narration text.
 - **`final.mp4` ships the best-scoring iteration, not necessarily the
   last.** A revision can make critique worse, not just fix it — the
   pipeline tracks the iteration with the fewest errors (then fewest
@@ -131,10 +136,22 @@ Copy `.env.example` → `.env` (gitignored; loaded via Node's
 | `MOTIFE_PROVIDER`, `MOTIFE_MODEL` | default generation provider/model |
 | `MOTIFE_CRITIQUE_PROVIDER`, `MOTIFE_CRITIQUE_MODEL` | default critique provider/model |
 | `MOTIFE_TTS` | default TTS provider |
+| `MOTIFE_TTS_MODEL` | default TTS model (either provider) |
+| `MOTIFE_TTS_VOICE` | default TTS voice — outranks `ELEVENLABS_VOICE_ID` |
+| `MOTIFE_TTS_INSTRUCTIONS` | OpenAI `gpt-4o-mini-tts` accent/style steering (openai only; part of the narration hash — editing it re-synthesizes every cached scene) |
 
-OpenAI TTS reuses `OPENAI_API_KEY`. Default model ids live in one table
-(`src/agent/providers.ts`) and will drift as vendors ship — override with
-flags/env rather than treating the table as authoritative.
+OpenAI TTS reuses `OPENAI_API_KEY`. Default LLM model ids live in one
+table (`src/agent/providers.ts`); default TTS model/voice ids live in a
+separate one (`src/tts/defaults.ts`) — both will drift as vendors ship,
+override with flags/env rather than treating either table as authoritative.
+
+**zh-TW narration accent (Phase 3 failure mode 3, resolved via A/B):** the
+code default stays OpenAI `alloy` — a safe, zero-config fallback — but the
+Phase 4 A/B (`progress/2026-08-17-phase-4-polish-and-publish/tts-ab/`)
+picked ElevenLabs' "Xu Ming" (`taiwan mandarin`) voice over it. That
+verdict is NOT a code default, because an ElevenLabs voice id only works
+once it's in *your* account's voice library — see `.env.example`'s
+commented-out override block for the exact env vars.
 
 ## 6. Implementation map
 
@@ -149,6 +166,6 @@ flags/env rather than treating the table as authoritative.
 | Bundle/select/renderMedia/renderStill (one shared `inputProps`) | `src/agent/render.ts` |
 | Full loop orchestration | `src/agent/pipeline.ts` |
 | Eval concepts + runner | `src/agent/evalConcepts.ts`, `src/agent/commands/eval.ts` |
-| TTS providers / synthesis cache / duration backfill | `src/tts/` |
+| TTS providers / model+voice resolution / defaults / synthesis cache / duration backfill | `src/tts/` |
 | Frame selection / vision critique / report rendering | `src/critique/` |
 | Renderer-side audio sidecar + metadata passthrough | `src/compiler/render/audioManifest.ts`, `previewMetadata.ts`, `DslVideo.tsx` |

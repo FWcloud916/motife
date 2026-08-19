@@ -13,8 +13,9 @@ export const audioManifestEntrySchema = z
     src: z.string().min(1),
     /** Measured from the actual audio file, never estimated. */
     durationInSeconds: z.number().positive(),
-    /** sha256 over provider/voice/narration — the cache key that lets a
-     * revision loop skip re-synthesis of unchanged scenes. */
+    /** sha256 over provider/voice/model/instructions/narration — the
+     * cache key that lets a revision loop skip re-synthesis of unchanged
+     * scenes. */
     narrationHash: z.string().min(1),
     /** Silence before the narration starts inside its scene. */
     delaySeconds: z.number().min(0),
@@ -30,8 +31,25 @@ export const audioManifestSchema = z
 export type AudioManifestEntry = z.infer<typeof audioManifestEntrySchema>;
 export type AudioManifest = z.infer<typeof audioManifestSchema>;
 
-export function narrationHash(provider: string, voice: string, narration: string): string {
-  return createHash("sha256").update(`${provider}\n${voice}\n${narration}`).digest("hex");
+/**
+ * Object param, not positional — provider/voice/model are all free-form
+ * strings, so a positional argument-order mistake is invisible to the type
+ * checker and would show up only as wrong caching behavior (exactly the
+ * bug class this hash exists to prevent). JSON-encoded as a fixed-order
+ * tuple rather than newline-joined: `instructions`/`narration` are free
+ * text that can legally contain newlines, and newline-joining would let
+ * `{instructions:"a\nb", narration:"c"}` collide with
+ * `{instructions:"a", narration:"b\nc"}`.
+ */
+export function narrationHash(input: {
+  provider: string;
+  voice: string;
+  model: string;
+  instructions?: string;
+  narration: string;
+}): string {
+  const tuple = [input.provider, input.voice, input.model, input.instructions ?? "", input.narration];
+  return createHash("sha256").update(JSON.stringify(tuple)).digest("hex");
 }
 
 /** Zod-gated parse of a manifest file's contents; returns null (never

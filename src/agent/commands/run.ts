@@ -24,7 +24,10 @@ options:
   --model <id>                generation model id
   --lang <bcp47>              narration language (default zh-TW)
   --tts <name>                openai | elevenlabs (default openai)
+  --tts-model <id>            TTS model (openai default gpt-4o-mini-tts;
+                              elevenlabs default eleven_multilingual_v2)
   --voice <id>                TTS voice
+  --tts-instructions <text>   OpenAI gpt-4o-mini-tts style/accent steering
   --no-audio                  skip TTS; durations stay the LLM's estimates
   --critique-provider <name>  vision provider (default anthropic)
   --critique-model <id>       vision model id
@@ -42,7 +45,9 @@ export async function run(argv: string[]): Promise<number> {
         model: { type: "string" },
         lang: { type: "string" },
         tts: { type: "string" },
+        "tts-model": { type: "string" },
         voice: { type: "string" },
+        "tts-instructions": { type: "string" },
         "no-audio": { type: "boolean" },
         "critique-provider": { type: "string" },
         "critique-model": { type: "string" },
@@ -82,12 +87,22 @@ export async function run(argv: string[]): Promise<number> {
 
   const ttsProvider: TtsProvider | null = args.values["no-audio"]
     ? null
-    : createTtsProvider({ flag: args.values.tts, voice: args.values.voice });
+    : createTtsProvider({
+        flag: args.values.tts,
+        voice: args.values.voice,
+        model: args.values["tts-model"],
+        instructions: args.values["tts-instructions"],
+      });
 
   const runRoot = args.values.run ?? defaultRunRoot(prompt);
   console.log(`run directory: ${runRoot}`);
   console.log(`generation: ${provider} (${model}); critique: ${critiqueProvider} (${critiqueModel})`);
-  console.log(ttsProvider ? `tts: ${ttsProvider.name} (${ttsProvider.voice})` : "tts: disabled");
+  console.log(
+    ttsProvider
+      ? `tts: ${ttsProvider.name} (voice ${ttsProvider.voice}, model ${ttsProvider.model})` +
+          (ttsProvider.instructions ? " +instructions" : "")
+      : "tts: disabled",
+  );
 
   const result = await runPipeline({
     prompt,

@@ -1,7 +1,6 @@
 // ElevenLabs TTS — POST /v1/text-to-speech/{voiceId}, one call per scene.
+import { DEFAULT_TTS_MODELS } from "./defaults";
 import type { TtsProvider } from "./provider";
-
-const DEFAULT_MODEL = "eleven_multilingual_v2";
 
 export function createElevenLabsTts(options: { voice?: string; model?: string } = {}): TtsProvider {
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -15,10 +14,11 @@ export function createElevenLabsTts(options: { voice?: string; model?: string } 
       "ElevenLabs TTS needs a voice id — pass --voice <id> or set ELEVENLABS_VOICE_ID.",
     );
   }
-  const model = options.model ?? DEFAULT_MODEL;
+  const model = options.model ?? DEFAULT_TTS_MODELS.elevenlabs;
   return {
     name: "elevenlabs",
     voice,
+    model,
     async synthesize(text: string) {
       const response = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`,

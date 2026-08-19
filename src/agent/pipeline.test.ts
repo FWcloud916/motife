@@ -321,6 +321,7 @@ describe("runPipeline", () => {
     const ttsProvider: TtsProvider = {
       name: "openai",
       voice: "test",
+      model: "test-model",
       synthesize: async () => ({ audio: new Uint8Array([1]), format: "mp3" }),
     };
     const result = await runPipeline(

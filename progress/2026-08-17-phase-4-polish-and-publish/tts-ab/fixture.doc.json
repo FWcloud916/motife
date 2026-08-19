@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "id": "TtsAbFixture",
+  "title": "TTS A/B fixture",
+  "scenes": [
+    {
+      "id": "control",
+      "beat": "intro",
+      "durationInSeconds": 6,
+      "narration": "當生產者製造訊息的速度超過消費者能處理的速度，佇列會不斷堆積，最終拖垮整個系統。",
+      "content": { "type": "pill", "text": "control — clean Mandarin, no loanwords" }
+    },
+    {
+      "id": "loanword",
+      "beat": "breakdown",
+      "durationInSeconds": 8,
+      "narration": "一個 JWT 由 Header、Payload、Signature 三段組成。前兩段只是 Base64URL 編碼，任何人都能讀；真正防止竄改的是簽章。",
+      "content": { "type": "pill", "text": "loanword — 5 English tokens mixed in" }
+    },
+    {
+      "id": "codeswitch",
+      "beat": "walkthrough",
+      "durationInSeconds": 8,
+      "narration": "B+Tree 把資料由上而下分層排序：root 指向 internal node，internal node 指向 leaf，每個 leaf 之間還用指標串成一條鏈。",
+      "content": { "type": "pill", "text": "codeswitch — worst-case mid-sentence switching" }
+    },
+    {
+      "id": "summary",
+      "beat": "summary",
+      "durationInSeconds": 7,
+      "narration": "記住三件事：永遠驗證簽章、完整檢查 claims，而且不要把敏感資料放進 payload。JWT 證明完整性，不負責保密。",
+      "content": { "type": "pill", "text": "summary — closing cadence, moderate loanwords" }
+    }
+  ]
+}

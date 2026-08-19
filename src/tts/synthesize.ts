@@ -1,7 +1,8 @@
 // Per-scene synthesis loop with content-hash caching. The narrationHash
-// (provider + voice + narration text) is what makes the critique-revision
-// loop cheap: a revision that only moves boxes re-synthesizes nothing; a
-// revision that rewrites one scene's narration re-synthesizes one file.
+// (provider + voice + model + instructions + narration text) is what makes
+// the critique-revision loop cheap: a revision that only moves boxes
+// re-synthesizes nothing; a revision that rewrites one scene's narration
+// re-synthesizes one file.
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DslDocument } from "../dsl";
@@ -62,7 +63,13 @@ export async function synthesizeDoc(options: SynthesizeDocOptions): Promise<Synt
   const reused: string[] = [];
 
   for (const scene of doc.scenes) {
-    const hash = narrationHash(provider.name, provider.voice, scene.narration);
+    const hash = narrationHash({
+      provider: provider.name,
+      voice: provider.voice,
+      model: provider.model,
+      instructions: provider.instructions,
+      narration: scene.narration,
+    });
     const src = `audio/${scene.id}.mp3`;
     const filePath = path.join(audioDir, `${scene.id}.mp3`);
 
@@ -74,7 +81,7 @@ export async function synthesizeDoc(options: SynthesizeDocOptions): Promise<Synt
       continue;
     }
 
-    log(`tts: ${scene.id} → ${provider.name}/${provider.voice}`);
+    log(`tts: ${scene.id} → ${provider.name}/${provider.voice}/${provider.model}`);
     const { audio } = await provider.synthesize(scene.narration);
     await writeFile(filePath, audio);
     const durationInSeconds = await measureDurationSeconds(filePath);

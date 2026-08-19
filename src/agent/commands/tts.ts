@@ -19,8 +19,13 @@ scene durations backfilled from the measured audio.
 options:
   --run <dir>       run directory (required)
   --tts <name>      openai | elevenlabs (default: $MOTIFE_TTS or openai)
-  --voice <id>      voice (openai default: alloy; elevenlabs: required
-                    unless ELEVENLABS_VOICE_ID is set)
+  --tts-model <id>  TTS model (default: $MOTIFE_TTS_MODEL, or openai
+                    gpt-4o-mini-tts / elevenlabs eleven_multilingual_v2)
+  --voice <id>      voice (default: $MOTIFE_TTS_VOICE, then openai alloy;
+                    elevenlabs: required unless ELEVENLABS_VOICE_ID is set)
+  --tts-instructions <text>
+                    OpenAI gpt-4o-mini-tts style/accent steering (default:
+                    $MOTIFE_TTS_INSTRUCTIONS; openai only)
   --lead <sec>      silence before narration per scene (default 0.3)
   --tail <sec>      padding after narration per scene (default 0.7)
   --force           ignore the narration-hash cache and re-synthesize`;
@@ -34,7 +39,9 @@ export async function run(argv: string[]): Promise<number> {
       options: {
         run: { type: "string" },
         tts: { type: "string" },
+        "tts-model": { type: "string" },
         voice: { type: "string" },
+        "tts-instructions": { type: "string" },
         lead: { type: "string" },
         tail: { type: "string" },
         force: { type: "boolean" },
@@ -94,7 +101,16 @@ export async function run(argv: string[]): Promise<number> {
     throw err;
   }
 
-  const provider = createTtsProvider({ flag: args.values.tts, voice: args.values.voice });
+  const provider = createTtsProvider({
+    flag: args.values.tts,
+    voice: args.values.voice,
+    model: args.values["tts-model"],
+    instructions: args.values["tts-instructions"],
+  });
+  console.log(
+    `tts: ${provider.name} (voice ${provider.voice}, model ${provider.model})` +
+      (provider.instructions ? " +instructions" : ""),
+  );
 
   const { manifest, synthesized, reused } = await synthesizeDoc({
     doc: parsed.doc,

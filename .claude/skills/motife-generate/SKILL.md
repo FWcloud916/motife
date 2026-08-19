@@ -19,7 +19,7 @@ express those, they are not in the schema.
   happens in a run directory under `out/runs/`.
 - `doc.json` is the only file you edit; `doc.tts.json` is derived — after
   any edit, re-run `motife tts` (its narration-hash cache re-synthesizes
-  only scenes whose narration changed).
+  only scenes whose narration/voice/model/instructions actually changed).
 
 ## Workflow
 
