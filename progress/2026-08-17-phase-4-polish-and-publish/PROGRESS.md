@@ -5,7 +5,7 @@
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
-**Updated:** 2026-08-19
+**Updated:** 2026-08-21
 
 ---
 
@@ -276,10 +276,10 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 5 follow-up — Typed LLM/TTS provider interruption taxonomy; recoverable quota/auth/rate-limit/network/5xx pauses batch with exit 75; fatal provider 4xx stops it
 - [x] PR 5 follow-up — Per-scene atomic TTS manifest, hash-bound render/stills/critique reuse, paid generation/revision/critique result persistence, state-derived all-concept eval report
 - [x] PR 5 follow-up — Resume regression suite (state corruption/version/config, provider pause, completed no-op, artifact reuse, partial TTS) + keyless CLI exit-75 smoke
-- [ ] PR 5 — Run screening pass (`--set stress --label screen --no-audio --max-revisions 1`) in background
-- [ ] PR 5 — Run full stress pass (`--set stress`, sourcing the main checkout's `.env` for the ElevenLabs winner)
-- [ ] PR 5 — Run baseline re-run (`--set baseline`) — Phase 4 acceptance criterion 1
-- [ ] PR 5 — Hand off report links + failure-mode summary to the user for human scoring (`stress/RESULTS.md`)
+- [x] PR 5 — Run screening pass (`--set stress --label screen --no-audio --max-revisions 1`) in background
+- [x] PR 5 — Run full stress pass (`--set stress`, sourcing the main checkout's `.env` for the ElevenLabs winner)
+- [x] PR 5 — Run baseline re-run (`--set baseline`) — Phase 4 acceptance criterion 1
+- [x] PR 5 — Hand off report links + failure-mode summary to the user for human scoring (`stress/RESULTS.md`)
 
 ## Work log
 
@@ -313,6 +313,11 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - PR 5 opened: https://github.com/FWcloud916/motife/pull/17 (branch phase-4/stress-test).
 - PR 5 煙霧測試(binary-heap, --no-audio --max-revisions 0)驗證整條 motife eval --set stress 路徑對真實 API 端到端可用:report.md 正確產生 outcome 標籤/docWarnings inline/失敗模式彙整表格/依 set 及格線註腳。確認無誤後在背景依序啟動三輪真實跑法(task bbavsiyy0,source 主 checkout .env 取得 ElevenLabs Xu Ming voice):1) 篩選 pass --label screen --no-audio --max-revisions 1(估 1.5-2.5h)2) 完整 stress pass(估 2.5-4.5h)3) baseline 重跑(驗收條件第 1 項,估 <15min)。跑完後會交付 report 連結與失敗模式彙整,人工評分欄位留給使用者。
 - PR 5 follow-up implemented full durable resume/checkpoint support after the real screening batch exhausted provider credits: atomic/versioned run/eval states with strict schema+contract rejection, persisted configuration and ordered concept set, run stage hashes, completed no-op, failed opt-in retry, persisted-set subsets, provider interruption exit 75, batch stop-before-next-concept, and per-scene TTS durability. Paid generation/revision/critique outputs are saved to state before ordinary artifacts; valid render/stills/critique artifacts are reused. Added 17 regression tests (321 total) plus a keyless real CLI pause→resume smoke (both invocations exit 75 and preserve `stage=generate`). `docs/agent-pipeline.md` now documents the state and operator contract. Existing screening work-log entry above was preserved; the old stateless directories remain intentionally unsupported and must be rerun under a new label.
+
+### 2026-08-21
+
+- PR 5 real runs completed from a fresh state after provider credentials were restored. Screening (`stress-screen`) completed 12/12:10 clean,2 exhausted (`git-rebase-vs-merge` offscreen;`sql-isolation-levels` overlap). The run exposed a report bug:shipped critique warnings were mislabeled and aggregated as unresolved errors. Fixed `evalReport.ts` to include only severity=`error` in that table and added a regression test;the rebuilt screening summary now contains exactly those two real errors.
+- Full stress run completed 12/12 with ElevenLabs Xu Ming (`eleven_multilingual_v2`):all 12 outcomes clean,zero unresolved critique errors,zero layout-lint failure modes. Baseline rerun completed 3/3 clean;automatic critique did not repeat the three Phase 3 symptoms. `db-index` retains one warning about caption/B-tree visual crowding,which is explicitly handed to human scoring rather than misclassified as an error. Full baseline report archived as `eval-baseline-2026-08-21.md`;`stress/RESULTS.md` records paths,automatic conclusions,and the pending human gates. `pnpm verify` green after the report fix (324 tests + render/audio smoke).
 
 ## Outcome
 

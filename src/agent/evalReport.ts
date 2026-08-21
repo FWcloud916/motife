@@ -138,7 +138,7 @@ export function renderEvalReport(options: EvalReportOptions): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** Groups every concept's unresolved-at-ship critique issues (by `kind`)
+/** Groups every concept's unresolved-at-ship critique errors (by `kind`)
  * and every iteration's validation warnings (by lint `code`, deduped per
  * concept so 3 iterations repeating the same warning count once) — the
  * input PR 6's fix queue consumes directly. */
@@ -151,6 +151,7 @@ function renderFailureModeSummary(results: readonly EvalRunResult[]): string[] {
     const r = entry.result;
     const shipped = r.iterations.find((iter) => iter.iteration === r.shippedIteration);
     for (const issue of shipped?.issues ?? []) {
+      if (issue.severity !== "error") continue;
       addTo(critiqueByKind, issue.kind, entry.slug);
     }
     for (const iter of r.iterations) {

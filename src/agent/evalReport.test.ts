@@ -153,6 +153,37 @@ describe("renderEvalReport", () => {
     expect(out).toMatch(/diagram_too_many_nodes \| 2 \| a, b/);
   });
 
+  it("does not report shipped critique warnings as unresolved errors", () => {
+    const result: PipelineResult = {
+      ...cleanResult(),
+      iterations: [
+        {
+          iteration: 1,
+          errors: 0,
+          warnings: 1,
+          issues: [
+            {
+              sceneId: "summary",
+              severity: "warning",
+              kind: "pacing",
+              description: "The final card appears briefly.",
+              suggestion: "Give the card more time.",
+            },
+          ],
+          docWarnings: [],
+        },
+      ],
+    };
+    const results: EvalRunResult[] = [
+      { slug: "a", title: "A", result, error: null, elapsedSeconds: 1 },
+    ];
+    const out = renderEvalReport(baseOptions({ results }));
+    expect(out).toContain("WARNING / pacing");
+    expect(out).toContain("失敗模式彙整");
+    expect(out).toContain("無。");
+    expect(out).not.toContain("critique (未解決 error) | pacing");
+  });
+
   it("reports 'no failure modes' when nothing fired", () => {
     const results: EvalRunResult[] = [
       { slug: "a", title: "A", result: cleanResult(), error: null, elapsedSeconds: 1 },
