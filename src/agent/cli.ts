@@ -50,7 +50,7 @@ const COMMANDS: Record<string, CommandSpec> = {
     load: () => import("./commands/run"),
   },
   eval: {
-    summary: "Run all eval-set concepts end-to-end and write a scoring report",
+    summary: "Run a concept set (baseline/stress/all) end-to-end and write a scoring report",
     load: () => import("./commands/eval"),
   },
 };

@@ -13,6 +13,7 @@ import { groq } from "@ai-sdk/groq";
 import type { LanguageModel } from "ai";
 import type { ProviderName } from "./providers";
 import { PROVIDER_ENV_KEYS } from "./providers";
+import { normalizeProviderError, ProviderError } from "./providerError";
 
 export type LlmContentPart =
   | { type: "text"; text: string }
@@ -39,26 +40,32 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 32_000;
 
 export function createLlmClient(spec: { provider: ProviderName; model: string }): LlmClient {
   const envKey = PROVIDER_ENV_KEYS[spec.provider];
-  if (!process.env[envKey]) {
-    throw new Error(
-      `Provider "${spec.provider}" needs ${envKey} set (via .env or the environment). ` +
-        `See .env.example.`,
-    );
-  }
   const model = modelFor(spec.provider, spec.model);
   return {
     async complete(req: LlmRequest): Promise<{ text: string }> {
-      const { instructions, rest } = splitInstructions(req.messages);
-      const result = await generateText({
-        model,
-        // AI SDK v7 rejects system-role entries inside `messages`
-        // (allowSystemInMessages defaults to false) — system content must
-        // ride the `instructions` option instead.
-        ...(instructions === null ? {} : { instructions }),
-        messages: rest.map(toModelMessage),
-        maxOutputTokens: req.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-      });
-      return { text: result.text };
+      try {
+        if (!process.env[envKey]) {
+          throw new ProviderError({
+            provider: spec.provider,
+            statusCode: 401,
+            recoverable: true,
+            message: `Provider "${spec.provider}" needs ${envKey} set (via .env or the environment). See .env.example.`,
+          });
+        }
+        const { instructions, rest } = splitInstructions(req.messages);
+        const result = await generateText({
+          model,
+          // AI SDK v7 rejects system-role entries inside `messages`
+          // (allowSystemInMessages defaults to false) — system content must
+          // ride the `instructions` option instead.
+          ...(instructions === null ? {} : { instructions }),
+          messages: rest.map(toModelMessage),
+          maxOutputTokens: req.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        });
+        return { text: result.text };
+      } catch (error) {
+        throw normalizeProviderError(spec.provider, error);
+      }
     },
   };
 }

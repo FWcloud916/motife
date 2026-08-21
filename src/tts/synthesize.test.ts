@@ -172,6 +172,24 @@ describe("synthesizeDoc", () => {
     expect(provider.calls).toHaveLength(4);
     expect(result.synthesized).toHaveLength(4);
   });
+
+  it("persists each completed scene and resumes after a mid-document interruption", async () => {
+    class InterruptingTts extends CountingTts {
+      override async synthesize(text: string) {
+        if (this.calls.length === 2) throw new Error("quota exhausted");
+        return super.synthesize(text);
+      }
+    }
+    const first = new InterruptingTts();
+    await expect(synthesizeDoc(options(first))).rejects.toThrow("quota exhausted");
+    const partial = parseAudioManifest(JSON.parse(await readFile(path.join(dir, "audio-manifest.json"), "utf8")));
+    expect(Object.keys(partial?.scenes ?? {})).toEqual(["intro", "breakdown"]);
+
+    const resumed = new CountingTts();
+    const result = await synthesizeDoc(options(resumed));
+    expect(result.reused).toEqual(["intro", "breakdown"]);
+    expect(resumed.calls).toEqual(["Nothing to see yet.", "A short summary text."]);
+  });
 });
 
 // The parsed document is structurally the raw JSON (zod passthrough of

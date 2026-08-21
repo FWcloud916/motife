@@ -13,6 +13,7 @@ import type { TtsProvider } from "../tts/provider";
 import { FakeLlmClient } from "./fakeLlm";
 import type { PipelineStages } from "./pipeline";
 import { runPipeline } from "./pipeline";
+import { ProviderError } from "./providerError";
 import { stillFileName } from "./render";
 import type { RenderContext } from "./render";
 
@@ -139,10 +140,17 @@ describe("runPipeline", () => {
     expect(result).toMatchObject({
       ok: true,
       clean: true,
+      outcome: "clean",
       generateAttempts: 1,
       shippedIteration: 1,
     });
-    expect(result.iterations).toEqual([{ iteration: 1, errors: 0, warnings: 0, issues: [] }]);
+    expect(result.iterations).toHaveLength(1);
+    expect(result.iterations[0]).toMatchObject({ iteration: 1, errors: 0, warnings: 0, issues: [] });
+    // VALID_DOC's narration (26 chars / 2s = 13 chars/sec) trips
+    // checkNarrationPacing's 12 chars/sec threshold on every scene — a
+    // zero-new-fixture proof that docWarnings is actually wired up.
+    expect(result.iterations[0].docWarnings).toHaveLength(4);
+    expect(result.iterations[0].docWarnings.every((w) => w.code === "narration_pacing")).toBe(true);
     expect(calls.renderedVideos).toHaveLength(1);
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:1");
     expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
@@ -163,6 +171,7 @@ describe("runPipeline", () => {
     const result = await runPipeline(baseOptions(client), stages);
 
     expect(result.clean).toBe(true);
+    expect(result.outcome).toBe("clean");
     expect(result.iterations.map((summary) => summary.errors)).toEqual([1, 0]);
     expect(result.shippedIteration).toBe(2);
     expect(calls.renderedVideos).toHaveLength(2);
@@ -197,6 +206,7 @@ describe("runPipeline", () => {
 
     expect(result.ok).toBe(true);
     expect(result.clean).toBe(false);
+    expect(result.outcome).toBe("exhausted");
     expect(result.iterations).toHaveLength(2); // maxRevisions + 1
     expect(calls.renderedVideos).toHaveLength(2);
     expect(result.shippedIteration).toBe(1);
@@ -221,6 +231,7 @@ describe("runPipeline", () => {
     const result = await runPipeline({ ...baseOptions(client), maxRevisions: 2 }, stages);
 
     expect(result.iterations.map((summary) => summary.errors)).toEqual([1, 2, 1]);
+    expect(result.outcome).toBe("exhausted");
     expect(calls.renderedVideos).toHaveLength(3);
     // Iteration 3 ties iteration 1's score (1 error, 0 warnings) — the
     // EARLIER iteration ships, not the last one that merely matched it.
@@ -234,6 +245,7 @@ describe("runPipeline", () => {
     const result = await runPipeline({ ...baseOptions(client), maxRevisions: 1 }, stages);
 
     expect(result.iterations.map((summary) => summary.errors)).toEqual([2, 1]);
+    expect(result.outcome).toBe("exhausted");
     expect(calls.renderedVideos).toHaveLength(2);
     expect(result.shippedIteration).toBe(2);
     expect(await readFile(path.join(dir, "run", "final.mp4"), "utf8")).toBe("fake-video:2");
@@ -253,6 +265,7 @@ describe("runPipeline", () => {
 
     expect(result.ok).toBe(true);
     expect(result.clean).toBe(false);
+    expect(result.outcome).toBe("revision-failed");
     expect(result.iterations).toHaveLength(1); // loop broke after failed revision
     expect(calls.renderedVideos).toHaveLength(1);
     // doc.json still the original.
@@ -294,7 +307,13 @@ describe("runPipeline", () => {
     const client = new FakeLlmClient(["bad", "bad", "bad", "bad"]);
     const result = await runPipeline(baseOptions(client), stages);
 
-    expect(result).toMatchObject({ ok: false, clean: false, finalMp4: null, generateAttempts: 4 });
+    expect(result).toMatchObject({
+      ok: false,
+      clean: false,
+      outcome: "generation-failed",
+      finalMp4: null,
+      generateAttempts: 4,
+    });
     expect(calls.renderedVideos).toHaveLength(0);
     expect(await readFile(path.join(dir, "run", "report.md"), "utf8")).toContain(
       "never produced a valid document",
@@ -355,5 +374,95 @@ describe("runPipeline", () => {
     await runPipeline(baseOptions(client), stages);
 
     expect(calls.prepareServeUrls).toEqual([undefined, "fake://bundle"]);
+  });
+
+  it("returns a completed resume without calling any stage or LLM", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    const options = baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)]));
+    const first = await runPipeline(options, stages);
+    expect(first.status).toBe("completed");
+
+    const second = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([])), resume: true },
+      {
+        buildSystemPrompt: async () => { throw new Error("must not build prompt"); },
+        prepareRender: async () => { throw new Error("must not prepare renderer"); },
+      },
+    );
+    expect(second).toEqual(first);
+    expect(calls.renderedVideos).toHaveLength(1);
+  });
+
+  it("pauses on a recoverable generation interruption and resumes generation", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    const interrupted = {
+      complete: async () => {
+        throw new ProviderError({ provider: "test", message: "quota exhausted", statusCode: 429, recoverable: true });
+      },
+    };
+    const first = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([])), generationClient: interrupted },
+      stages,
+    );
+    expect(first).toMatchObject({ status: "paused", ok: false, outcome: "paused" });
+    expect(calls.renderedVideos).toHaveLength(0);
+
+    const resumed = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])), resume: true },
+      stages,
+    );
+    expect(resumed.status).toBe("completed");
+    expect(calls.renderedVideos).toHaveLength(1);
+  });
+
+  it("reuses completed render and still checkpoints after critique pauses", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    const first = await runPipeline(baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])), {
+      ...stages,
+      runCritique: async () => {
+        throw new ProviderError({ provider: "vision", message: "network down", recoverable: true });
+      },
+    });
+    expect(first.status).toBe("paused");
+    expect(calls.renderedVideos).toHaveLength(1);
+
+    const resumed = await runPipeline(
+      { ...baseOptions(new FakeLlmClient([])), resume: true },
+      stages,
+    );
+    expect(resumed.status).toBe("completed");
+    expect(calls.renderedVideos).toHaveLength(1);
+    expect(calls.critiques).toBe(1);
+  });
+
+  it("refuses a non-empty legacy directory without state", async () => {
+    const root = path.join(dir, "run");
+    await mkdir(root, { recursive: true });
+    await writeFile(path.join(root, "legacy.txt"), "old run");
+    const { stages } = fakeStages([CLEAN]);
+    await expect(runPipeline(baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])), stages)).rejects.toThrow(/not empty.*--resume/);
+  });
+
+  it("turns SIGINT during a stage into a paused checkpoint", async () => {
+    const { stages, calls } = fakeStages([CLEAN]);
+    let signalled = false;
+    const interruptedStages = {
+      ...stages,
+      renderVideo: async (context: Parameters<NonNullable<typeof stages.renderVideo>>[0], output: string) => {
+        if (!signalled) {
+          signalled = true;
+          process.emit("SIGINT");
+        }
+        await stages.renderVideo!(context, output);
+      },
+    };
+    const result = await runPipeline(
+      baseOptions(new FakeLlmClient([JSON.stringify(VALID_DOC)])),
+      interruptedStages,
+    );
+    expect(result).toMatchObject({ status: "paused", ok: false, outcome: "paused", failureText: "Interrupted by SIGINT" });
+    expect(calls.renderedVideos).toHaveLength(1);
+    const state = JSON.parse(await readFile(path.join(dir, "run", "run-state.json"), "utf8")) as { status: string; stage: string };
+    expect(state).toMatchObject({ status: "paused", stage: "render" });
   });
 });

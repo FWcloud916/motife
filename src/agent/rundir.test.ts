@@ -47,6 +47,7 @@ describe("defaultRunRoot", () => {
 describe("run/iteration path layout", () => {
   it("is the documented contract (docs/agent-pipeline.md §3)", () => {
     const paths = runPaths("out/runs/x");
+    expect(paths.runStateJson).toBe(path.join("out/runs/x", "run-state.json"));
     expect(paths.docJson).toBe(path.join("out/runs/x", "doc.json"));
     expect(paths.docFinalJson).toBe(path.join("out/runs/x", "doc.final.json"));
     expect(paths.docTtsJson).toBe(path.join("out/runs/x", "doc.tts.json"));

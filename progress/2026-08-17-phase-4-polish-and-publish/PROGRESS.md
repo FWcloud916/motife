@@ -1,11 +1,11 @@
 # Phase 4 — 打磨與發布 (Polish and Publish)
 
 **Slug:** phase-4-polish-and-publish
-**Status:** in-progress
+**Status:** review
 **Ticket:** N/A
 **Related plan:** [phase-4-polish-and-publish-jaunty-knitting-locket.md](../_plans/phase-4-polish-and-publish-jaunty-knitting-locket.md)
 **Created:** 2026-08-17
-**Updated:** 2026-08-19
+**Updated:** 2026-08-21
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Scope | Branch | Ticket | Notes |
 |---|---|---|---|
-| `motife` | TBD | N/A |  |
+| `motife` | `phase-4/stress-test` | N/A |  |
 
 ## Background & goals
 
@@ -235,7 +235,7 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 | 2 | Camera clamp + measured viewport | Zoom fit-clamp + per-frame translation clamp, both against Camera's MEASURED real box (not the composition size) — full fix for failure mode 2, incl. the deeper viewport-assumption cause found mid-verification; see finding below | **Yes** | done ([#14](https://github.com/FWcloud916/motife/pull/14)) |
 | 3 | Diagram overflow bounding | `SafeAreaContext` real-pixel cap on standalone Diagram (component-layer guarantee) + 4 `validate.ts` lints: `diagram_label_too_long`/`diagram_label_clipped`(error)/`diagram_too_many_nodes` (estimated text/node-count budgets) + `camera_content_too_tall` (the density-lint hardening — height-only, estimation-immune) | **Yes** | done ([#15](https://github.com/FWcloud916/motife/pull/15)) |
 | 4 | TTS model wiring + A/B | `--tts-model`/`--tts-instructions`/`MOTIFE_TTS_*` wired; narration-hash includes model+instructions; A/B run complete — winner ElevenLabs "Xu Ming", applied as an `.env` override (see finding below) | Audio re-synthesis only (gitignored `out/` only; zero baseline audio exists) | done ([#16](https://github.com/FWcloud916/motife/pull/16)) |
-| 5 | 10+ concept stress test | New `stressConcepts.ts` + `eval --set stress`; screening pass (`--no-audio --max-revisions 1`) to control the ~18min/concept worst-case cost before full passes | No | not started |
+| 5 | 10+ concept stress test | New `stressConcepts.ts` (12 concepts) + `eval --set baseline\|stress\|all` + `--label`; `PipelineResult.outcome` + `IterationSummary.docWarnings` surfaced (previously all 3 warning-severity PR-3 lints were silently dropped); path-collision fix; also folds in acceptance item 1 (baseline re-run) | No | review ([#17](https://github.com/FWcloud916/motife/pull/17)) |
 | 6 | Second fix round | Apply fixes for failure modes surfaced by the stress test — components/compiler first, prompt second (hard rule, motife-plan.md §2 分層原則) | Depends on findings | not started |
 | 7 | `@remotion/player` preview page | `npx remotion add @remotion/player` (pinned, never `pnpm add`); `node:http` server using the run-dir as state; new `web/` workspace (Vite); preview available at "audio-ready" (post-TTS, pre-final-render), honoring the TTS-driven-timeline rule. **Scope-capped 2026-08-19:** this page has a known sunset (Phase 6 replaces the render engine and `@remotion/player` goes with it) — build it thin, to validate the prompt→preview→download interaction, not as a durable frontend | No | not started |
 | 8 | Publish-form decision + docs closeout | User decision recorded in motife-plan.md; docs sweep (component-library.md, dsl-schema.md, agent-pipeline.md) with Last-updated bumps | No | not started |
@@ -276,6 +276,23 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 - [x] PR 4 — Full verification: `pnpm verify` green (282 tests), `motife {run,tts,eval} --help` show the new flags, fixture doc validates clean
 - [x] PR 4 — Open PR
 - [x] PR 4 — A/B run: all 7 candidates generated (incl. adding 2 ElevenLabs zh voices to the account after confirmation) and delivered; user scored `LISTEN.md`, winner is ElevenLabs "Xu Ming" — applied as a `.env` override (main checkout) + documented in `.env.example`/`docs/agent-pipeline.md`; failure mode 3 marked resolved — folded into PR #16 rather than a separate 4b since it hadn't merged yet
+- [x] PR 5 — New `src/agent/stressConcepts.ts` (12 concepts across 4 coverage axes the 3 baselines under-exercise; includes the required heap/trie-shaped concept for the deferred TreeDiagram decision)
+- [x] PR 5 — New `src/agent/conceptSets.ts` (`EvalSetName`, `CONCEPT_SETS`, `selectConcepts` — `--only` now filters WITHIN the selected set, and an unmatched slug is a hard error naming that set's legal slugs, not a silent empty-result fallthrough)
+- [x] PR 5 — `pipeline.ts` taxonomy fixes: `RunOutcome` exported + `PipelineResult.outcome`; `mustParse` returns `{doc, warnings}`; `IterationSummary.docWarnings` (pre-TTS parse, so PR 3's duration-independent layout lints are captured without narration_pacing noise) — previously ALL 3 warning-severity PR-3 lints were silently dropped by the pipeline and invisible in every report
+- [x] PR 5 — New `src/agent/evalReport.ts` (extracted from `commands/eval.ts`, AI-SDK-free so it's unit-testable): outcome labels, inlined `docWarnings`, a "failure mode summary" table grouping by critique kind / lint code across concepts (direct PR 6 input), set-aware scoring footer, `n/a` 旁白 column under `--no-audio`
+- [x] PR 5 — `commands/eval.ts`: `--set baseline\|stress\|all` (default `baseline`, preserves prior behavior) + `--label`; output path moved to `out/eval/<date>/<set>[-<label>]/` (fixes same-day report.md collisions — confirmed via CLI: unknown `--set`/out-of-set `--only`/invalid `--label` all error correctly before touching any provider); report rewritten after every concept (not just at the end) so a multi-hour run doesn't lose completed results on a crash
+- [x] PR 5 — Tests: `conceptSets.test.ts` (13 cases), `evalReport.test.ts` (9 cases), `pipeline.test.ts` updated (the one exact-match assertion that broke, broke informatively — VALID_DOC's fixture narration already trips `narration_pacing` on all 4 scenes, a zero-new-fixture proof the plumbing works) + `outcome` assertions across all 7 existing scenarios
+- [x] PR 5 — Docs: `docs/agent-pipeline.md` (CLI table, new "Eval sets" subsection with cost/time table + 3-command runbook, run-dir contract, implementation map, Last-updated), `progress/.../stress/{README.md,RESULTS.md}` (runbook + scoring sheet, mirrors PR 4's `tts-ab/`)
+- [x] PR 5 — Full verification: `pnpm verify` green (304 tests), `motife eval --help` shows `--set`/`--label` with correct per-set concept counts
+- [x] PR 5 — Open PR
+- [x] PR 5 follow-up — Versioned atomic `run-state.json` / `eval-state.json`; stage-level run resume and batch resume (`--retry-failed`, persisted-set `--only`, config mismatch guard, completed no-op)
+- [x] PR 5 follow-up — Typed LLM/TTS provider interruption taxonomy; recoverable quota/auth/rate-limit/network/5xx pauses batch with exit 75; fatal provider 4xx stops it
+- [x] PR 5 follow-up — Per-scene atomic TTS manifest, hash-bound render/stills/critique reuse, paid generation/revision/critique result persistence, state-derived all-concept eval report
+- [x] PR 5 follow-up — Resume regression suite (state corruption/version/config, provider pause, completed no-op, artifact reuse, partial TTS) + keyless CLI exit-75 smoke
+- [x] PR 5 — Run screening pass (`--set stress --label screen --no-audio --max-revisions 1`) in background
+- [x] PR 5 — Run full stress pass (`--set stress`, sourcing the main checkout's `.env` for the ElevenLabs winner)
+- [x] PR 5 — Run baseline re-run (`--set baseline`) — Phase 4 acceptance criterion 1
+- [x] PR 5 — Hand off report links + failure-mode summary to the user for human scoring (`stress/RESULTS.md`)
 
 ## Work log
 
@@ -305,6 +322,15 @@ Proposed (modeled on the roadmap's M4 milestone "對外可展示(預覽頁 + 10 
 
 - TTS A/B resolved same-day: user filled LISTEN.md, winner is ElevenLabs 'Xu Ming' (A3T1GnLHdn0WL5w4TMtq, taiwan mandarin, eleven_multilingual_v2) -- beat every OpenAI candidate (with and without accent-steering instructions) on accent naturalness. Applied as a .env-level override on the main checkout (MOTIFE_TTS=elevenlabs, ELEVENLABS_VOICE_ID=A3T1GnLHdn0WL5w4TMtq, MOTIFE_TTS_MODEL=eleven_multilingual_v2) -- deliberately NOT a src/tts/defaults.ts code default, since the voice id only works once added to the specific ElevenLabs account's library (verified: the account had zero Chinese voices until two taiwan-mandarin candidates were found via the shared voice library and added after explicit user confirmation). .env.example documents the override as a commented-out recipe; docs/agent-pipeline.md's Configuration section records the decision; tts-ab/LISTEN.md marks itself done. All three Phase 3 failure modes are now resolved (1: PR 3, 2: PR 2, 3: this). Folded into PR #16 (still open) rather than a separate PR 4b.
 - PR 4 merged: https://github.com/FWcloud916/motife/pull/16 (merge commit c788a9d). All three Phase 3 failure modes are now resolved (1: Diagram overflow, PR 3 / #15; 2: Camera framing, PR 2 / #14; 3: TTS accent, PR 4 / #16 -- winner ElevenLabs Xu Ming, applied as an .env override). Next up: PR 5 (10+ concept stress test) in a future session.
+- PR 5 code implemented: stressConcepts.ts (12 concepts, 4 coverage axes incl. required heap/trie), conceptSets.ts (--set baseline/stress/all + selectConcepts pure logic), pipeline.ts taxonomy fixes (exported RunOutcome, PipelineResult.outcome, IterationSummary.docWarnings via mustParse returning warnings -- fixes the finding that all 3 warning-severity PR-3 lints were silently dropped and invisible in every report), evalReport.ts (extracted, AI-SDK-free, unit-tested: outcome labels, inlined docWarnings, failure-mode summary table for PR 6, set-aware footer, n/a narration column). commands/eval.ts rewritten: --set/--label flags, path-collision fix (out/eval/<date>/<set>[-<label>]/), incremental report writes so a multi-hour run survives a crash. pnpm verify green (304 tests, keyless). CLI verified live: --help shows correct per-set counts (3/12/15); unknown --set, out-of-set --only, and invalid --label all error correctly before touching any provider. Per user decision, will run BOTH the screening pass and the full stress pass in the background after opening the PR (not left to the user like PR 4's tts-ab), plus the baseline re-run (Phase 4 acceptance item 1, previously unassigned to any PR) -- human scoring columns still left for the user.
+- PR 5 opened: https://github.com/FWcloud916/motife/pull/17 (branch phase-4/stress-test).
+- PR 5 煙霧測試(binary-heap, --no-audio --max-revisions 0)驗證整條 motife eval --set stress 路徑對真實 API 端到端可用:report.md 正確產生 outcome 標籤/docWarnings inline/失敗模式彙整表格/依 set 及格線註腳。確認無誤後在背景依序啟動三輪真實跑法(task bbavsiyy0,source 主 checkout .env 取得 ElevenLabs Xu Ming voice):1) 篩選 pass --label screen --no-audio --max-revisions 1(估 1.5-2.5h)2) 完整 stress pass(估 2.5-4.5h)3) baseline 重跑(驗收條件第 1 項,估 <15min)。跑完後會交付 report 連結與失敗模式彙整,人工評分欄位留給使用者。
+- PR 5 follow-up implemented full durable resume/checkpoint support after the real screening batch exhausted provider credits: atomic/versioned run/eval states with strict schema+contract rejection, persisted configuration and ordered concept set, run stage hashes, completed no-op, failed opt-in retry, persisted-set subsets, provider interruption exit 75, batch stop-before-next-concept, and per-scene TTS durability. Paid generation/revision/critique outputs are saved to state before ordinary artifacts; valid render/stills/critique artifacts are reused. Added 17 regression tests (321 total) plus a keyless real CLI pause→resume smoke (both invocations exit 75 and preserve `stage=generate`). `docs/agent-pipeline.md` now documents the state and operator contract. Existing screening work-log entry above was preserved; the old stateless directories remain intentionally unsupported and must be rerun under a new label.
+
+### 2026-08-21
+
+- PR 5 real runs completed from a fresh state after provider credentials were restored. Screening (`stress-screen`) completed 12/12:10 clean,2 exhausted (`git-rebase-vs-merge` offscreen;`sql-isolation-levels` overlap). The run exposed a report bug:shipped critique warnings were mislabeled and aggregated as unresolved errors. Fixed `evalReport.ts` to include only severity=`error` in that table and added a regression test;the rebuilt screening summary now contains exactly those two real errors.
+- Full stress run completed 12/12 with ElevenLabs Xu Ming (`eleven_multilingual_v2`):all 12 outcomes clean,zero unresolved critique errors,zero layout-lint failure modes. Baseline rerun completed 3/3 clean;automatic critique did not repeat the three Phase 3 symptoms. `db-index` retains one warning about caption/B-tree visual crowding,which is explicitly handed to human scoring rather than misclassified as an error. Full baseline report archived as `eval-baseline-2026-08-21.md`;`stress/RESULTS.md` records paths,automatic conclusions,and the pending human gates. `pnpm verify` green after the report fix (324 tests + render/audio smoke).
 
 ## Outcome
 
